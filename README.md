@@ -12,6 +12,7 @@ Aplikacja webowa do nauki języka włoskiego dla Polaków, generująca artykuły
 - **Dialogi i kultura** — konwersacje, kontekst kulturowy, idiomy
 - **TTS** — wymowa włoskich słów i zdań przez Web Speech API (regulowana prędkość)
 - **Biblioteka** — historia wygenerowanych artykułów zapisywana w `localStorage`
+- **Klucz API w przeglądarce** — aplikacja pyta o klucz przy pierwszym uruchomieniu; jest on przechowywany tylko lokalnie w przeglądarce
 
 ## Stos technologiczny
 
@@ -23,37 +24,56 @@ Aplikacja webowa do nauki języka włoskiego dla Polaków, generująca artykuły
 | AI | OpenRouter API → `google/gemini-2.5-flash` |
 | HTTP client | openai SDK (OpenAI-compatible) |
 
-## Uruchomienie lokalne
+## Szybki start (Windows)
 
 **Wymagania:** Node.js 18+
 
-```bash
-# 1. Sklonuj repozytorium
-git clone https://github.com/adam001d/wloski-mistrz-ai.git
-cd wloski-mistrz-ai
+### Tryb deweloperski
 
-# 2. Zainstaluj zależności
+Kliknij dwukrotnie `run.bat` lub uruchom z terminala:
+
+```bat
+run.bat
+```
+
+Aplikacja uruchamia się pod `http://localhost:3000`.
+Przy pierwszym uruchomieniu aplikacja poprosi o klucz API OpenRouter.
+
+### Build produkcyjny
+
+```bat
+build.bat
+```
+
+Gotowe pliki lądują w folderze `dist\`.
+
+---
+
+## Uruchomienie ręczne (npm)
+
+```bash
+# 1. Zainstaluj zależności
 npm install
 
-# 3. Skonfiguruj klucz API
-#    Wejdź na https://openrouter.ai/keys i wygeneruj klucz
-echo "OPENROUTER_API_KEY=sk-or-v1-twój-klucz" > .env.local
-
-# 4. Uruchom serwer deweloperski
+# 2. Uruchom serwer deweloperski
 npm run dev
+
+# 3. (opcjonalnie) Build produkcyjny
+npm run build
+
+# 4. (opcjonalnie) Podgląd buildu produkcyjnego
+npm run preview
 ```
 
-Aplikacja dostępna pod `http://localhost:3000`.
+## Konfiguracja klucza API
 
-## Konfiguracja
+Przy pierwszym uruchomieniu aplikacja wyświetla ekran konfiguracji klucza API. Nie trzeba tworzyć żadnych plików `.env`.
 
-Plik `.env.local` (nie jest commitowany do repo):
+1. Wejdź na [openrouter.ai/keys](https://openrouter.ai/keys) i wygeneruj klucz (format `sk-or-v1-...`)
+2. Wklej klucz w polu i kliknij **Zapisz i kontynuuj**
+3. Klucz zostaje zapisany w `localStorage` przeglądarki — dostępne są darmowe limity dla wielu modeli
 
-```env
-OPENROUTER_API_KEY=sk-or-v1-...
-```
-
-Klucz API OpenRouter uzyskasz na [openrouter.ai/keys](https://openrouter.ai/keys). Dostępne są darmowe limity dla wielu modeli.
+Aby zmienić klucz w dowolnym momencie, kliknij ikonę klucza w prawym górnym rogu paska nawigacji.
 
 ### Zmiana modelu AI
 
@@ -74,9 +94,11 @@ wloski-mistrz-ai/
 │   └── QuizSection.tsx    # Komponent quizów
 ├── services/
 │   └── geminiService.ts   # Integracja z OpenRouter API
-├── App.tsx                # Główny komponent (biblioteka, formularz)
+├── App.tsx                # Główny komponent + ekran konfiguracji klucza API
 ├── types.ts               # Definicje typów TypeScript
-└── index.tsx              # Entry point
+├── index.tsx              # Entry point
+├── run.bat                # Szybkie uruchomienie w trybie deweloperskim (Windows)
+└── build.bat              # Szybki build produkcyjny (Windows)
 ```
 
 ## Licencja
