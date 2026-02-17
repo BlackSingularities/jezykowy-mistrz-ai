@@ -28,23 +28,68 @@
       }
     </script>
     <style>
-      body {
-        background-color: #F8FAFC;
+      /* ── Base ─────────────────────────────────────────────────────── */
+      body { background-color: #F8FAFC; }
+
+      /* ── Scrollbar ────────────────────────────────────────────────── */
+      ::-webkit-scrollbar { width: 6px; }
+      ::-webkit-scrollbar-track { background: transparent; }
+      ::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 3px; }
+      ::-webkit-scrollbar-thumb:hover { background: #94A3B8; }
+
+      /* ── Keyframes ────────────────────────────────────────────────── */
+      @keyframes fade-in {
+        from { opacity: 0; transform: translateY(6px); }
+        to   { opacity: 1; transform: translateY(0); }
       }
-      /* Custom scrollbar for cleaner look */
-      ::-webkit-scrollbar {
-        width: 8px;
+      @keyframes fade-in-up {
+        from { opacity: 0; transform: translateY(24px); }
+        to   { opacity: 1; transform: translateY(0); }
       }
-      ::-webkit-scrollbar-track {
-        background: transparent;
+      @keyframes bb-flash {
+        0%   { opacity: 1; }
+        40%  { opacity: 0.1; }
+        60%  { opacity: 0.1; }
+        100% { opacity: 1; }
       }
-      ::-webkit-scrollbar-thumb {
-        background: #CBD5E1;
-        border-radius: 4px;
+
+      /* ── Utility classes ──────────────────────────────────────────── */
+      .animate-fade-in     { animation: fade-in 0.3s ease-out both; }
+      .animate-fade-in-up  { animation: fade-in-up 0.5s ease-out both; }
+      .bb-flash            { animation: bb-flash 0.18s ease; }
+
+      /* ── BilingualBlock interactive styles ────────────────────────── */
+      .bb-clickable {
+        cursor: pointer;
+        border-radius: 3px;
+        transition: background-color 0.12s ease, opacity 0.1s ease;
+        /* Subtle dashed underline hint */
+        text-decoration-line: underline;
+        text-decoration-style: dotted;
+        text-decoration-color: rgba(0,140,69,0.25);
+        text-underline-offset: 3px;
       }
-      ::-webkit-scrollbar-thumb:hover {
-        background: #94A3B8;
+      .bb-clickable:hover {
+        background-color: rgba(0, 140, 69, 0.06);
+        text-decoration-color: rgba(0,140,69,0.5);
       }
+      .bb-clickable:active {
+        background-color: rgba(0, 140, 69, 0.14);
+      }
+
+      /* Badge shown when a block is desynced from global language */
+      .bb-badge {
+        display: inline-block;
+        font-size: 9px;
+        line-height: 1;
+        margin-left: 2px;
+        vertical-align: super;
+        opacity: 0.7;
+        pointer-events: none;
+      }
+
+      /* ── Prose overrides ──────────────────────────────────────────── */
+      .prose p { margin-bottom: 0.75em; }
     </style>
   <script type="importmap">
 {
