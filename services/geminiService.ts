@@ -1,14 +1,6 @@
 import OpenAI from "openai";
 import { Lesson } from "../types";
 
-const apiKey = process.env.API_KEY || "";
-
-const client = new OpenAI({
-  baseURL: "https://openrouter.ai/api/v1",
-  apiKey,
-  dangerouslyAllowBrowser: true,
-});
-
 const bilingualSchema = {
   type: "object",
   properties: {
@@ -135,7 +127,13 @@ const lessonJsonSchema = {
   required: ["topic", "emoji", "introduction", "vocabulary", "grammar", "dialogue", "culture", "idiom", "common_mistakes", "useful_phrases"],
 };
 
-export const generateLesson = async (topic: string): Promise<Lesson> => {
+export const generateLesson = async (topic: string, apiKey: string): Promise<Lesson> => {
+  const client = new OpenAI({
+    baseURL: "https://openrouter.ai/api/v1",
+    apiKey,
+    dangerouslyAllowBrowser: true,
+  });
+
   try {
     const response = await client.chat.completions.create({
       model: "google/gemini-2.5-flash",
