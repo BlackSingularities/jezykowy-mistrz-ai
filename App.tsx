@@ -28,12 +28,12 @@ const DIFF_GRADIENT: Record<string, string> = {
   C1: 'from-violet-500 to-purple-700',
 };
 
-const DIFF_TEXT: Record<string, string> = {
-  A1: 'Początkujący',
-  A2: 'Elementarny',
-  B1: 'Średniozaawansowany',
-  B2: 'Wyższy średni',
-  C1: 'Zaawansowany',
+const DIFF_LABELS: Record<string, { pl: string; it: string }> = {
+  A1: { pl: 'Początkujący',        it: 'Principiante' },
+  A2: { pl: 'Elementarny',         it: 'Elementare' },
+  B1: { pl: 'Średniozaawansowany', it: 'Intermedio' },
+  B2: { pl: 'Wyższy średni',       it: 'Intermedio sup.' },
+  C1: { pl: 'Zaawansowany',        it: 'Avanzato' },
 };
 
 // ─── ApiKeySetup ──────────────────────────────────────────────────────────────
@@ -113,7 +113,8 @@ const LessonCard: React.FC<{
   onDelete: (e: React.MouseEvent) => void;
 }> = ({ lesson, lang, onOpen, onDelete }) => {
   const gradient = DIFF_GRADIENT[lesson.difficulty_level] ?? DIFF_GRADIENT.B1;
-  const diffLabel = DIFF_TEXT[lesson.difficulty_level] ?? lesson.difficulty_level;
+  const diffLabels = DIFF_LABELS[lesson.difficulty_level];
+  const diffLabel = diffLabels ? diffLabels[lang] : lesson.difficulty_level;
   const topicText = lang === 'pl' ? lesson.topic.pl : lesson.topic.it;
   const subtitleText = lesson.subtitle ? (lang === 'pl' ? lesson.subtitle.pl : lesson.subtitle.it) : null;
   const introText = lang === 'pl' ? lesson.introduction?.pl : lesson.introduction?.it;
@@ -182,7 +183,9 @@ const LessonCard: React.FC<{
         {/* Vocabulary preview */}
         {lesson.vocabulary?.length > 0 && (
           <div>
-            <p className="text-[9px] font-bold uppercase text-slate-400 tracking-widest mb-1.5">Kluczowe słowa</p>
+            <p className="text-[9px] font-bold uppercase text-slate-400 tracking-widest mb-1.5">
+              {lang === 'it' ? 'Parole chiave' : 'Kluczowe słowa'}
+            </p>
             <div className="flex flex-wrap gap-1.5">
               {lesson.vocabulary.slice(0, 3).map((v, i) => (
                 <span key={i} className="inline-flex items-center gap-1 text-xs bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 text-slate-700 font-medium">
@@ -211,7 +214,7 @@ const LessonCard: React.FC<{
           )}
         </div>
         <span className="text-italian-green font-semibold group-hover:translate-x-1 transition-transform">
-          Czytaj →
+          {lang === 'it' ? 'Leggi →' : 'Czytaj →'}
         </span>
       </div>
     </article>
@@ -223,12 +226,13 @@ const LessonCard: React.FC<{
 const ChangeKeyModal: React.FC<{ onClose: () => void; onSave: (key: string) => void }> = ({ onClose, onSave }) => {
   const [value, setValue] = useState('');
   const [error, setError] = useState('');
+  const { globalLang: l } = useLang();
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
     const trimmed = value.trim();
     if (!trimmed.startsWith('sk-or-')) {
-      setError('Klucz powinien zaczynać się od "sk-or-".');
+      setError(l === 'it' ? 'La chiave deve iniziare con "sk-or-".' : 'Klucz powinien zaczynać się od "sk-or-".');
       return;
     }
     onSave(trimmed);
@@ -242,8 +246,12 @@ const ChangeKeyModal: React.FC<{ onClose: () => void; onSave: (key: string) => v
           <XMarkIcon className="w-5 h-5" />
         </button>
         <div>
-          <h2 className="font-serif font-bold text-xl text-slate-900 mb-1">Zmień klucz API</h2>
-          <p className="text-sm text-slate-500">Podaj nowy klucz OpenRouter.</p>
+          <h2 className="font-serif font-bold text-xl text-slate-900 mb-1">
+            {l === 'it' ? 'Cambia chiave API' : 'Zmień klucz API'}
+          </h2>
+          <p className="text-sm text-slate-500">
+            {l === 'it' ? 'Inserisci una nuova chiave OpenRouter.' : 'Podaj nowy klucz OpenRouter.'}
+          </p>
         </div>
         <form onSubmit={handleSubmit} className="space-y-4">
           <input
@@ -260,7 +268,7 @@ const ChangeKeyModal: React.FC<{ onClose: () => void; onSave: (key: string) => v
             disabled={!value.trim()}
             className="w-full py-3 bg-slate-900 text-white rounded-xl font-semibold hover:bg-italian-green transition-colors disabled:opacity-40"
           >
-            Zapisz
+            {l === 'it' ? 'Salva' : 'Zapisz'}
           </button>
         </form>
       </div>
@@ -322,30 +330,30 @@ const AppInner: React.FC<{ apiKey: string; onChangeKey: () => void }> = ({ apiKe
 
   if (activeLesson) {
     return (
-      <div className="min-h-screen bg-slate-50 text-slate-900">
-        <nav className="w-full bg-white/80 backdrop-blur-md sticky top-0 z-50 border-b border-slate-200">
-          <div className="max-w-7xl mx-auto px-4 h-14 flex items-center justify-between">
-            <button
-              onClick={() => setActiveLesson(null)}
-              className="flex items-center gap-2 text-slate-500 hover:text-italian-green transition-colors text-sm font-medium"
-            >
-              ← Biblioteka
-            </button>
-            <button
-              onClick={onChangeKey}
-              title="Zmień klucz API"
-              className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
-            >
-              <KeyIcon className="w-4 h-4" />
-            </button>
-          </div>
-        </nav>
-        <div className="px-2 py-6">
-          <LessonView lesson={activeLesson} onBack={() => setActiveLesson(null)} />
-        </div>
-      </div>
+      <LessonView
+        lesson={activeLesson}
+        onBack={() => setActiveLesson(null)}
+        onChangeKey={onChangeKey}
+      />
     );
   }
+
+  // ── Etykiety dwujęzyczne ─────────────────────────────────────────────────────
+  const l = globalLang;
+  const L = {
+    headline:     l === 'it' ? 'Di cosa vuoi leggere oggi?' : 'O czym chcesz dzisiaj poczytać?',
+    subtitle:     l === 'it' ? 'Crea articoli, lezioni e approfondimenti culturali con l\'AI.' : 'Twórz artykuły, lekcje i opracowania kulturowe z AI.',
+    placeholder:  l === 'it' ? "Inserisci un argomento (es. 'Rinascimento', 'Caffè', 'Opera')…" : "Wpisz temat (np. 'Renesans', 'Kawa', 'Opera')…",
+    generating:   l === 'it' ? 'Generazione in corso — attendi…' : 'Generowanie lekcji — to może chwilę zająć…',
+    errorGen:     l === 'it' ? 'Impossibile generare l\'articolo. Controlla la chiave API e riprova.' : 'Nie udało się wygenerować artykułu. Sprawdź klucz API i spróbuj ponownie.',
+    yourArticles: l === 'it' ? 'I tuoi articoli' : 'Twoje artykuły',
+    search:       l === 'it' ? 'Cerca…' : 'Szukaj…',
+    noArticles:   l === 'it' ? 'Nessun articolo. Crea il tuo primo!' : 'Brak artykułów. Stwórz swój pierwszy!',
+    noArticlesSub:l === 'it' ? 'Inserisci un argomento — es. "Pizza", "Roma" o "Venezia"' : 'Wpisz temat powyżej — np. "Pizza", "Rzym" lub "Wenecja"',
+    noResults:    (q: string) => l === 'it' ? `Nessun risultato per "${q}"` : `Brak wyników dla "${q}"`,
+    langToggle:   l === 'it' ? 'Cambia lingua carte' : 'Przełącz język kart',
+    apiKey:       l === 'it' ? 'Cambia chiave API' : 'Zmień klucz API',
+  };
 
   // ── Home / Library view ─────────────────────────────────────────────────────
 
@@ -353,27 +361,29 @@ const AppInner: React.FC<{ apiKey: string; onChangeKey: () => void }> = ({ apiKe
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans">
       {/* Navbar */}
       <nav className="w-full bg-white/80 backdrop-blur-md sticky top-0 z-50 border-b border-slate-200">
-        <div className="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between">
+        <div className="max-w-screen-2xl mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2 cursor-pointer select-none" onClick={() => setActiveLesson(null)}>
             <div className="flex gap-1">
               <div className="w-3 h-3 rounded-full bg-italian-green" />
               <div className="w-3 h-3 rounded-full bg-white border border-slate-200" />
               <div className="w-3 h-3 rounded-full bg-italian-red" />
             </div>
-            <span className="font-serif font-bold text-xl tracking-tight text-slate-900">Włoski Mistrz AI</span>
+            <span className="font-serif font-bold text-xl tracking-tight text-slate-900">
+              {l === 'it' ? 'Maestro Italiano AI' : 'Włoski Mistrz AI'}
+            </span>
           </div>
           <div className="flex items-center gap-2">
             <button
               onClick={toggleGlobal}
-              title="Przełącz język kart"
-              className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-full bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors"
+              title={L.langToggle}
+              className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold rounded-full bg-slate-900 text-white hover:bg-italian-green transition-all shadow-sm active:scale-95"
             >
               <LanguageIcon className="w-3.5 h-3.5" />
-              {globalLang === 'it' ? '🇮🇹 IT' : '🇵🇱 PL'}
+              {l === 'it' ? '🇮🇹 IT' : '🇵🇱 PL'}
             </button>
             <button
               onClick={onChangeKey}
-              title="Zmień klucz API"
+              title={L.apiKey}
               className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
             >
               <KeyIcon className="w-4 h-4" />
@@ -383,29 +393,29 @@ const AppInner: React.FC<{ apiKey: string; onChangeKey: () => void }> = ({ apiKe
       </nav>
 
       <main className="px-4 py-10">
-        <div className="max-w-5xl mx-auto space-y-14">
+        <div className="max-w-screen-2xl mx-auto space-y-14">
 
           {/* Hero */}
           <div className="text-center space-y-8 py-6 md:py-12">
             <div className="space-y-4">
               <h1 className="text-4xl md:text-6xl font-serif font-bold text-slate-900 tracking-tight leading-tight">
                 <span className="bg-clip-text text-transparent bg-gradient-to-r from-italian-green via-emerald-600 to-teal-700">
-                  O czym chcesz dzisiaj poczytać?
+                  {L.headline}
                 </span>
               </h1>
               <p className="text-lg text-slate-500 max-w-lg mx-auto font-light">
-                Twórz artykuły, lekcje i opracowania kulturowe z AI.
+                {L.subtitle}
               </p>
             </div>
 
-            <form onSubmit={handleSubmit} className="relative max-w-lg mx-auto w-full group">
+            <form onSubmit={handleSubmit} className="relative max-w-xl mx-auto w-full group">
               <div className="absolute -inset-1 bg-gradient-to-r from-italian-green via-emerald-400 to-teal-500 rounded-2xl blur opacity-20 group-hover:opacity-40 transition duration-500" />
               <div className="relative flex items-center bg-white rounded-xl shadow-2xl">
                 <input
                   type="text"
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
-                  placeholder="Wpisz temat (np. 'Renesans', 'Kawa', 'Opera')..."
+                  placeholder={L.placeholder}
                   className="w-full px-6 py-5 rounded-xl bg-transparent border-0 focus:ring-0 text-lg placeholder:text-slate-400 text-slate-800 outline-none"
                   disabled={status === 'loading'}
                 />
@@ -422,17 +432,16 @@ const AppInner: React.FC<{ apiKey: string; onChangeKey: () => void }> = ({ apiKe
               </div>
             </form>
 
-            {/* Loading indicator */}
             {status === 'loading' && (
               <div className="flex items-center justify-center gap-3 text-sm text-slate-500 animate-pulse">
                 <SparklesIcon className="w-4 h-4 text-italian-green" />
-                Generowanie lekcji — to może chwilę zająć…
+                {L.generating}
               </div>
             )}
 
             {status === 'error' && (
               <div className="text-italian-red bg-red-50 px-4 py-3 rounded-xl border border-red-100 inline-block text-sm font-medium animate-fade-in">
-                {errorMsg}
+                {L.errorGen}
               </div>
             )}
           </div>
@@ -443,11 +452,10 @@ const AppInner: React.FC<{ apiKey: string; onChangeKey: () => void }> = ({ apiKe
               <div className="flex items-center gap-2">
                 <BookOpenIcon className="w-5 h-5 text-slate-400" />
                 <h2 className="text-lg font-bold text-slate-700 uppercase tracking-wide">
-                  Twoje Artykuły
+                  {L.yourArticles}
                 </h2>
                 <span className="text-xs text-slate-400 font-normal">({history.length})</span>
               </div>
-              {/* Search */}
               {history.length > 3 && (
                 <div className="sm:ml-auto relative">
                   <MagnifyingGlassIcon className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -455,8 +463,8 @@ const AppInner: React.FC<{ apiKey: string; onChangeKey: () => void }> = ({ apiKe
                     type="text"
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
-                    placeholder="Szukaj..."
-                    className="pl-9 pr-4 py-2 rounded-xl border border-slate-200 bg-white text-sm text-slate-700 focus:ring-2 focus:ring-italian-green/30 outline-none transition w-48"
+                    placeholder={L.search}
+                    className="pl-9 pr-4 py-2 rounded-xl border border-slate-200 bg-white text-sm text-slate-700 focus:ring-2 focus:ring-italian-green/30 outline-none transition w-52"
                   />
                 </div>
               )}
@@ -465,15 +473,15 @@ const AppInner: React.FC<{ apiKey: string; onChangeKey: () => void }> = ({ apiKe
             {history.length === 0 ? (
               <div className="text-center py-24 bg-white rounded-3xl border-2 border-dashed border-slate-200 text-slate-400 space-y-2">
                 <p className="text-4xl">🇮🇹</p>
-                <p className="font-medium">Brak artykułów. Stwórz swój pierwszy!</p>
-                <p className="text-sm">Wpisz temat powyżej — np. "Pizza", "Rzym" lub "Passat Verbano"</p>
+                <p className="font-medium">{L.noArticles}</p>
+                <p className="text-sm">{L.noArticlesSub}</p>
               </div>
             ) : filteredHistory.length === 0 ? (
               <div className="text-center py-16 text-slate-400">
-                <p>Brak wyników dla <strong>"{search}"</strong></p>
+                <p>{L.noResults(search)}</p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                 {filteredHistory.map((lesson) => (
                   <LessonCard
                     key={lesson.id}
@@ -490,7 +498,7 @@ const AppInner: React.FC<{ apiKey: string; onChangeKey: () => void }> = ({ apiKe
       </main>
 
       <footer className="py-10 text-center text-slate-400 text-sm border-t border-slate-200/50 mt-8 bg-white/50">
-        <p>Włoski Mistrz AI &copy; 2025 · Powered by OpenRouter</p>
+        <p>{l === 'it' ? 'Maestro Italiano AI' : 'Włoski Mistrz AI'} &copy; 2025 · Powered by OpenRouter</p>
       </footer>
     </div>
   );
