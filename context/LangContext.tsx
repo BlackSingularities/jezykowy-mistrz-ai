@@ -1,23 +1,17 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export type Lang = 'it' | 'pl';
+export type Theme = 'light' | 'dark';
 
 export interface LangContextValue {
-  /** The language all BilingualBlocks follow by default. */
   globalLang: Lang;
-  /** Toggle all blocks simultaneously and sync any desynced blocks. */
   toggleGlobal: () => void;
-  /**
-   * Monotonically-increasing counter.
-   * BilingualBlock children watch this via useEffect to snap back to globalLang
-   * whenever a global toggle fires — even if the block was individually overridden.
-   */
   syncKey: number;
 }
 
-// ─── Context ──────────────────────────────────────────────────────────────────
+// ─── LangContext ──────────────────────────────────────────────────────────────
 
 const LangContext = createContext<LangContextValue>({
   globalLang: 'pl',
@@ -27,7 +21,44 @@ const LangContext = createContext<LangContextValue>({
 
 export const useLang = (): LangContextValue => useContext(LangContext);
 
-// ─── Provider ─────────────────────────────────────────────────────────────────
+// ─── ThemeContext ─────────────────────────────────────────────────────────────
+
+interface ThemeContextValue {
+  theme: Theme;
+  toggleTheme: () => void;
+}
+
+const ThemeContext = createContext<ThemeContextValue>({
+  theme: 'light',
+  toggleTheme: () => {},
+});
+
+export const useTheme = (): ThemeContextValue => useContext(ThemeContext);
+
+// ─── Providers ────────────────────────────────────────────────────────────────
+
+const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [theme, setTheme] = useState<Theme>(() => {
+    const saved = localStorage.getItem('app_theme') as Theme | null;
+    if (saved) return saved;
+    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  });
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('app_theme', theme);
+  }, [theme]);
+
+  const toggleTheme = useCallback(() => {
+    setTheme(t => (t === 'light' ? 'dark' : 'light'));
+  }, []);
+
+  return (
+    <ThemeContext.Provider value={{ theme, toggleTheme }}>
+      {children}
+    </ThemeContext.Provider>
+  );
+};
 
 export const LangProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [globalLang, setGlobalLang] = useState<Lang>('pl');
@@ -39,8 +70,10 @@ export const LangProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   return (
-    <LangContext.Provider value={{ globalLang, toggleGlobal, syncKey }}>
-      {children}
-    </LangContext.Provider>
+    <ThemeProvider>
+      <LangContext.Provider value={{ globalLang, toggleGlobal, syncKey }}>
+        {children}
+      </LangContext.Provider>
+    </ThemeProvider>
   );
 };

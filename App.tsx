@@ -1,8 +1,8 @@
-import React, { useState, useEffect, FormEvent } from 'react';
+import React, { useState, useEffect, useRef, FormEvent } from 'react';
 import { createRoot } from 'react-dom/client';
-import { generateLesson } from './services/geminiService';
-import { LessonView } from './components/LessonView';
-import { LangProvider, useLang } from './context/LangContext';
+import { generateLesson, loadModels, getSavedModel, saveModel, DEFAULT_MODEL, ORModel } from './services/geminiService';
+import { LessonView, getFavorites, toggleFavorite } from './components/LessonView';
+import { LangProvider, useLang, useTheme } from './context/LangContext';
 import { Lesson } from './types';
 import {
   SparklesIcon,
@@ -13,12 +13,66 @@ import {
   XMarkIcon,
   ClockIcon,
   MagnifyingGlassIcon,
+  ChevronDownIcon,
+  CpuChipIcon,
+  StarIcon,
 } from '@heroicons/react/24/solid';
-import { LanguageIcon } from '@heroicons/react/24/outline';
+import { LanguageIcon, SunIcon, MoonIcon, ArrowPathIcon, StarIcon as StarOutlineIcon } from '@heroicons/react/24/outline';
 
 const API_KEY_STORAGE = 'openrouter_api_key';
+const HISTORY_KEY    = 'italian_app_history'; // localStorage fallback key
 
-// ─── Difficulty colours ───────────────────────────────────────────────────────
+// ─── History persistence: osobne pliki ───────────────────────────────────────
+
+async function loadHistory(): Promise<Lesson[]> {
+  try {
+    const res = await fetch('/api/history');
+    if (!res.ok) throw new Error('api');
+    const data = await res.json();
+    if (Array.isArray(data) && data.length > 0) return data;
+    // Migracja ze starego localStorage (jednorazowa)
+    const local = localStorage.getItem(HISTORY_KEY);
+    if (local) {
+      const parsed = JSON.parse(local) as Lesson[];
+      if (parsed.length > 0) {
+        // zapisz każdą lekcję jako osobny plik
+        await Promise.all(parsed.map(l => saveLesson(l)));
+        localStorage.removeItem(HISTORY_KEY);
+        return parsed;
+      }
+    }
+    return [];
+  } catch {
+    try { return JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]'); }
+    catch { return []; }
+  }
+}
+
+async function saveLesson(lesson: Lesson): Promise<void> {
+  try {
+    await fetch(`/api/history/${lesson.id}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(lesson),
+    });
+  } catch {
+    // fallback: zapisz cały array do localStorage
+    const existing: Lesson[] = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
+    const updated = [lesson, ...existing.filter(l => l.id !== lesson.id)];
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(updated));
+  }
+}
+
+async function deleteLesson(id: string): Promise<void> {
+  try {
+    await fetch(`/api/history/${id}`, { method: 'DELETE' });
+  } catch {
+    const existing: Lesson[] = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(existing.filter(l => l.id !== id)));
+  }
+}
+
+// ─── Difficulty ───────────────────────────────────────────────────────────────
 
 const DIFF_GRADIENT: Record<string, string> = {
   A1: 'from-emerald-400 to-emerald-600',
@@ -34,6 +88,157 @@ const DIFF_LABELS: Record<string, { pl: string; it: string }> = {
   B1: { pl: 'Średniozaawansowany', it: 'Intermedio' },
   B2: { pl: 'Wyższy średni',       it: 'Intermedio sup.' },
   C1: { pl: 'Zaawansowany',        it: 'Avanzato' },
+};
+
+// ─── ModelPicker ──────────────────────────────────────────────────────────────
+
+const ModelPicker: React.FC<{
+  apiKey: string;
+  activeModel: string;
+  onChange: (modelId: string) => void;
+  lang: 'it' | 'pl';
+}> = ({ apiKey, activeModel, onChange, lang }) => {
+  const [open, setOpen] = useState(false);
+  const [models, setModels] = useState<ORModel[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [query, setQuery] = useState('');
+  const ref = useRef<HTMLDivElement>(null);
+
+  // Zamknij po kliknięciu poza
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
+
+  const openPicker = async () => {
+    setOpen(o => !o);
+    if (models.length > 0) return;
+    setLoading(true);
+    setError('');
+    try {
+      const list = await loadModels(apiKey);
+      // sortuj: darmowe/popularne najpierw (po nazwie)
+      setModels(list.sort((a, b) => a.id.localeCompare(b.id)));
+    } catch {
+      setError(lang === 'it' ? 'Impossibile caricare i modelli.' : 'Nie udało się załadować modeli.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const filtered = query.trim()
+    ? models.filter(m =>
+        m.id.toLowerCase().includes(query.toLowerCase()) ||
+        m.name.toLowerCase().includes(query.toLowerCase())
+      )
+    : models;
+
+  const shortName = (id: string) => id.split('/').pop() ?? id;
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        onClick={openPicker}
+        className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all active:scale-95 border"
+        style={{
+          background: 'var(--c-surface)',
+          borderColor: 'var(--c-border)',
+          color: 'var(--c-text)',
+          maxWidth: '180px',
+        }}
+        title={activeModel}
+      >
+        <CpuChipIcon className="w-3 h-3 shrink-0" style={{ color: 'var(--c-green)' }} />
+        <span className="truncate">{shortName(activeModel)}</span>
+        <ChevronDownIcon className={`w-3 h-3 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+
+      {open && (
+        <div
+          className="absolute right-0 top-full mt-1.5 z-50 rounded-xl shadow-2xl overflow-hidden animate-fade-in"
+          style={{
+            width: '320px',
+            background: 'var(--c-surface)',
+            border: '1px solid var(--c-border)',
+          }}
+        >
+          {/* Wyszukiwarka */}
+          <div className="p-2 border-b" style={{ borderColor: 'var(--c-border)' }}>
+            <div className="relative">
+              <MagnifyingGlassIcon className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2" style={{ color: 'var(--c-faint)' }} />
+              <input
+                autoFocus
+                type="text"
+                value={query}
+                onChange={e => setQuery(e.target.value)}
+                placeholder={lang === 'it' ? 'Cerca modello…' : 'Szukaj modelu…'}
+                className="w-full pl-8 pr-3 py-1.5 text-xs rounded-lg outline-none"
+                style={{ background: 'var(--c-bg)', border: '1px solid var(--c-border)', color: 'var(--c-text)' }}
+              />
+            </div>
+          </div>
+
+          {/* Lista */}
+          <div style={{ maxHeight: '320px', overflowY: 'auto' }}>
+            {loading && (
+              <div className="flex items-center justify-center gap-2 py-6 text-xs" style={{ color: 'var(--c-muted)' }}>
+                <SparklesIcon className="w-3.5 h-3.5 animate-spin" style={{ color: 'var(--c-green)' }} />
+                {lang === 'it' ? 'Caricamento…' : 'Ładowanie…'}
+              </div>
+            )}
+            {error && (
+              <p className="text-xs text-center py-4 px-3" style={{ color: 'var(--c-red)' }}>{error}</p>
+            )}
+            {!loading && !error && filtered.length === 0 && (
+              <p className="text-xs text-center py-4" style={{ color: 'var(--c-faint)' }}>
+                {lang === 'it' ? 'Nessun risultato.' : 'Brak wyników.'}
+              </p>
+            )}
+            {!loading && filtered.map(m => {
+              const isActive = m.id === activeModel;
+              const isFree = m.id.endsWith(':free');
+              return (
+                <button
+                  key={m.id}
+                  onClick={() => { onChange(m.id); setOpen(false); setQuery(''); }}
+                  className="w-full text-left px-3 py-2.5 transition-colors"
+                  style={{
+                    background: isActive ? 'var(--c-green-dim)' : 'transparent',
+                    borderBottom: '1px solid var(--c-border-soft)',
+                  }}
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-semibold truncate flex-1" style={{ color: isActive ? 'var(--c-green)' : 'var(--c-text)' }}>
+                      {m.name || m.id}
+                    </span>
+                    {isFree && (
+                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded"
+                        style={{ background: '#d1fae5', color: '#065f46' }}>FREE</span>
+                    )}
+                    {isActive && (
+                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded"
+                        style={{ background: 'var(--c-green)', color: '#fff' }}>✓</span>
+                    )}
+                  </div>
+                  <p className="text-[10px] mt-0.5 truncate" style={{ color: 'var(--c-faint)' }}>{m.id}</p>
+                  {m.context_length && (
+                    <p className="text-[10px]" style={{ color: 'var(--c-faint)' }}>
+                      ctx: {m.context_length.toLocaleString()}
+                    </p>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
 };
 
 // ─── ApiKeySetup ──────────────────────────────────────────────────────────────
@@ -53,49 +258,46 @@ const ApiKeySetup: React.FC<{ onSave: (key: string) => void }> = ({ onSave }) =>
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center px-4">
-      <div className="bg-white rounded-3xl shadow-xl border border-slate-100 p-10 max-w-md w-full space-y-8">
-        <div className="text-center space-y-3">
-          <div className="flex gap-2 justify-center">
-            <div className="w-4 h-4 rounded-full bg-italian-green"></div>
-            <div className="w-4 h-4 rounded-full bg-white border border-slate-200"></div>
-            <div className="w-4 h-4 rounded-full bg-italian-red"></div>
+    <div className="min-h-screen flex items-center justify-center px-4" style={{ background: 'var(--c-bg)', color: 'var(--c-text)' }}>
+      <div className="card p-8 max-w-sm w-full space-y-6">
+        <div className="text-center space-y-2">
+          <div className="flex gap-1.5 justify-center mb-3">
+            <div className="w-3 h-3 rounded-full" style={{ background: 'var(--c-green)' }} />
+            <div className="w-3 h-3 rounded-full border" style={{ borderColor: 'var(--c-border)' }} />
+            <div className="w-3 h-3 rounded-full" style={{ background: 'var(--c-red)' }} />
           </div>
-          <h1 className="text-3xl font-serif font-bold text-slate-900">Włoski Mistrz AI</h1>
-          <p className="text-slate-500 text-sm leading-relaxed">
-            Aby korzystać z aplikacji, podaj swój klucz API OpenRouter.<br/>
-            Wszystkie dane pozostają wyłącznie w Twojej przeglądarce.
+          <h1 className="text-2xl font-serif font-bold" style={{ color: 'var(--c-text)' }}>Włoski Mistrz AI</h1>
+          <p className="text-sm leading-relaxed" style={{ color: 'var(--c-muted)' }}>
+            Podaj klucz API OpenRouter. Dane pozostają wyłącznie w Twojej przeglądarce.
           </p>
         </div>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-3">
           <div>
-            <label className="block text-xs font-semibold text-slate-500 uppercase tracking-widest mb-2">
-              Klucz API OpenRouter
-            </label>
+            <label className="micro-label block mb-1.5">Klucz API OpenRouter</label>
             <input
               type="password"
               value={value}
               onChange={(e) => { setValue(e.target.value); setError(''); }}
               placeholder="sk-or-v1-..."
-              className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-italian-green/40 focus:border-italian-green outline-none text-slate-800 font-mono text-sm transition"
+              className="w-full px-3 py-2 rounded-lg font-mono text-sm outline-none transition"
+              style={{ background: 'var(--c-bg)', border: '1px solid var(--c-border)', color: 'var(--c-text)' }}
               autoFocus
             />
-            {error && <p className="mt-2 text-xs text-italian-red">{error}</p>}
+            {error && <p className="mt-1.5 text-xs" style={{ color: 'var(--c-red)' }}>{error}</p>}
           </div>
           <button
             type="submit"
             disabled={!value.trim()}
-            className="w-full py-3 bg-slate-900 text-white rounded-xl font-semibold hover:bg-italian-green transition-colors disabled:opacity-40"
+            className="w-full py-2.5 rounded-lg font-semibold text-sm transition-colors disabled:opacity-40"
+            style={{ background: 'var(--c-text)', color: '#fff' }}
           >
             Zapisz i kontynuuj →
           </button>
         </form>
-
-        <p className="text-xs text-slate-400 text-center leading-relaxed">
-          Uzyskaj klucz bezpłatnie na{' '}
+        <p className="text-xs text-center" style={{ color: 'var(--c-faint)' }}>
+          Klucz bezpłatnie na{' '}
           <a href="https://openrouter.ai/keys" target="_blank" rel="noopener noreferrer"
-            className="text-italian-green underline hover:text-emerald-700">
+            className="underline" style={{ color: 'var(--c-green)' }}>
             openrouter.ai/keys
           </a>
         </p>
@@ -111,7 +313,9 @@ const LessonCard: React.FC<{
   lang: 'it' | 'pl';
   onOpen: () => void;
   onDelete: (e: React.MouseEvent) => void;
-}> = ({ lesson, lang, onOpen, onDelete }) => {
+  isFav: boolean;
+  onToggleFav: (e: React.MouseEvent) => void;
+}> = ({ lesson, lang, onOpen, onDelete, isFav, onToggleFav }) => {
   const gradient = DIFF_GRADIENT[lesson.difficulty_level] ?? DIFF_GRADIENT.B1;
   const diffLabels = DIFF_LABELS[lesson.difficulty_level];
   const diffLabel = diffLabels ? diffLabels[lang] : lesson.difficulty_level;
@@ -122,73 +326,70 @@ const LessonCard: React.FC<{
   return (
     <article
       onClick={onOpen}
-      className="group bg-white rounded-3xl border border-slate-100 hover:border-italian-green/30 hover:shadow-2xl transition-all duration-300 cursor-pointer overflow-hidden flex flex-col"
+      className="group card card-hover cursor-pointer overflow-hidden flex flex-col"
     >
-      {/* Gradient header */}
-      <div className={`relative bg-gradient-to-br ${gradient} p-6 text-white overflow-hidden`}>
-        {/* Decorative blob */}
-        <div className="absolute -right-8 -top-8 w-32 h-32 rounded-full bg-white/10" />
-        <div className="absolute -right-2 -bottom-6 w-20 h-20 rounded-full bg-white/5" />
-
-        <div className="relative flex items-start justify-between gap-3">
+      <div className={`relative bg-gradient-to-br ${gradient} p-4 text-white overflow-hidden`}>
+        <div className="absolute -right-6 -top-6 w-24 h-24 rounded-full bg-white/10" />
+        <div className="relative flex items-start justify-between gap-2">
           <div className="flex-1 min-w-0">
-            {/* Emoji + difficulty */}
-            <div className="flex items-center gap-2 mb-3">
-              <span className="text-3xl">{lesson.emoji}</span>
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-2xl">{lesson.emoji}</span>
               <div>
-                <span className="text-[10px] font-bold uppercase tracking-widest bg-white/20 px-2 py-0.5 rounded-full">
+                <span className="text-[10px] font-bold uppercase tracking-wider bg-white/20 px-2 py-0.5 rounded-full">
                   {lesson.difficulty_level}
                 </span>
-                <span className="ml-2 text-[10px] text-white/70">{diffLabel}</span>
+                <span className="ml-1.5 text-[10px] text-white/70">{diffLabel}</span>
               </div>
             </div>
-            {/* Title */}
-            <h3 className="text-xl font-serif font-bold leading-snug text-white mb-1 line-clamp-2">
+            <h3 className="text-base font-serif font-bold leading-snug text-white mb-0.5 line-clamp-2">
               {topicText}
             </h3>
-            {/* Subtitle */}
             {subtitleText && (
-              <p className="text-xs text-white/70 italic line-clamp-1">{subtitleText}</p>
+              <p className="text-xs text-white/65 italic line-clamp-1">{subtitleText}</p>
             )}
           </div>
-          {/* Delete */}
-          <button
-            onClick={onDelete}
-            className="shrink-0 p-1.5 rounded-full bg-white/10 hover:bg-white/30 text-white/60 hover:text-white transition-all opacity-0 group-hover:opacity-100"
-            title="Usuń"
-          >
-            <TrashIcon className="w-3.5 h-3.5" />
-          </button>
+          <div className="flex items-center gap-1 shrink-0">
+            {/* Favorite */}
+            <button
+              onClick={onToggleFav}
+              className={`p-1.5 rounded-full bg-white/10 hover:bg-white/30 transition-all ${isFav ? 'opacity-100 text-yellow-300' : 'opacity-0 group-hover:opacity-100 text-white/70 hover:text-yellow-300'}`}
+              title={isFav ? 'Usuń z ulubionych' : 'Dodaj do ulubionych'}
+            >
+              {isFav ? <StarIcon className="w-3 h-3" /> : <StarOutlineIcon className="w-3 h-3" />}
+            </button>
+            {/* Delete */}
+            <button
+              onClick={onDelete}
+              className="shrink-0 p-1.5 rounded-full bg-white/10 hover:bg-white/30 text-white/60 hover:text-white transition-all opacity-0 group-hover:opacity-100"
+              title="Usuń"
+            >
+              <TrashIcon className="w-3 h-3" />
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Card body */}
-      <div className="flex-1 p-5 space-y-4">
-        {/* Tags */}
+      <div className="flex-1 p-4 space-y-3">
         {lesson.tags?.length > 0 && (
           <div className="flex flex-wrap gap-1">
             {lesson.tags.slice(0, 4).map((tag, i) => (
-              <span key={i} className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 font-medium border border-slate-200">
+              <span key={i} className="text-[10px] px-1.5 py-0.5 rounded-full font-medium"
+                style={{ background: 'var(--c-bg)', color: 'var(--c-muted)', border: '1px solid var(--c-border)' }}>
                 #{tag}
               </span>
             ))}
           </div>
         )}
-
-        {/* Intro excerpt */}
         {introText && (
-          <p className="text-sm text-slate-500 line-clamp-3 leading-relaxed">{introText}</p>
+          <p className="text-xs leading-relaxed line-clamp-3" style={{ color: 'var(--c-muted)' }}>{introText}</p>
         )}
-
-        {/* Vocabulary preview */}
         {lesson.vocabulary?.length > 0 && (
           <div>
-            <p className="text-[9px] font-bold uppercase text-slate-400 tracking-widest mb-1.5">
-              {lang === 'it' ? 'Parole chiave' : 'Kluczowe słowa'}
-            </p>
-            <div className="flex flex-wrap gap-1.5">
+            <p className="micro-label mb-1">{lang === 'it' ? 'Parole chiave' : 'Kluczowe słowa'}</p>
+            <div className="flex flex-wrap gap-1">
               {lesson.vocabulary.slice(0, 3).map((v, i) => (
-                <span key={i} className="inline-flex items-center gap-1 text-xs bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 text-slate-700 font-medium">
+                <span key={i} className="inline-flex items-center gap-1 text-xs rounded px-2 py-0.5 font-medium"
+                  style={{ background: 'var(--c-bg)', border: '1px solid var(--c-border)', color: 'var(--c-text)' }}>
                   <span className="font-serif">{v.word}</span>
                   {v.gender && (
                     <span className={`text-[9px] font-bold ${v.gender === 'm' ? 'text-sky-500' : v.gender === 'f' ? 'text-pink-500' : 'text-slate-400'}`}>
@@ -202,9 +403,9 @@ const LessonCard: React.FC<{
         )}
       </div>
 
-      {/* Card footer */}
-      <div className="px-5 pb-5 pt-2 border-t border-slate-50 flex items-center justify-between text-xs text-slate-400">
-        <div className="flex items-center gap-3">
+      <div className="px-4 pb-4 pt-2 flex items-center justify-between text-xs"
+        style={{ borderTop: '1px solid var(--c-border-soft)', color: 'var(--c-faint)' }}>
+        <div className="flex items-center gap-2">
           <span>{new Date(lesson.timestamp).toLocaleDateString('pl-PL')}</span>
           {lesson.estimated_reading_minutes && (
             <span className="flex items-center gap-1">
@@ -213,7 +414,7 @@ const LessonCard: React.FC<{
             </span>
           )}
         </div>
-        <span className="text-italian-green font-semibold group-hover:translate-x-1 transition-transform">
+        <span className="font-semibold group-hover:translate-x-1 transition-transform" style={{ color: 'var(--c-green)' }}>
           {lang === 'it' ? 'Leggi →' : 'Czytaj →'}
         </span>
       </div>
@@ -240,33 +441,37 @@ const ChangeKeyModal: React.FC<{ onClose: () => void; onSave: (key: string) => v
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4">
-      <div className="bg-white rounded-2xl shadow-2xl border border-slate-100 p-8 max-w-sm w-full space-y-5 relative animate-fade-in">
-        <button onClick={onClose} className="absolute top-4 right-4 p-1 text-slate-400 hover:text-slate-700">
-          <XMarkIcon className="w-5 h-5" />
+    <div className="fixed inset-0 z-50 flex items-center justify-center px-4"
+      style={{ background: 'rgba(0,0,0,.4)', backdropFilter: 'blur(4px)' }}>
+      <div className="card p-6 max-w-sm w-full space-y-4 relative animate-fade-in">
+        <button onClick={onClose} className="absolute top-3 right-3 p-1 rounded transition-colors"
+          style={{ color: 'var(--c-faint)' }}>
+          <XMarkIcon className="w-4 h-4" />
         </button>
         <div>
-          <h2 className="font-serif font-bold text-xl text-slate-900 mb-1">
+          <h2 className="font-serif font-bold text-base" style={{ color: 'var(--c-text)' }}>
             {l === 'it' ? 'Cambia chiave API' : 'Zmień klucz API'}
           </h2>
-          <p className="text-sm text-slate-500">
+          <p className="text-xs mt-0.5" style={{ color: 'var(--c-muted)' }}>
             {l === 'it' ? 'Inserisci una nuova chiave OpenRouter.' : 'Podaj nowy klucz OpenRouter.'}
           </p>
         </div>
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-3">
           <input
             type="password"
             value={value}
             onChange={(e) => { setValue(e.target.value); setError(''); }}
             placeholder="sk-or-v1-..."
-            className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-italian-green/40 focus:border-italian-green outline-none text-slate-800 font-mono text-sm transition"
+            className="w-full px-3 py-2 rounded-lg font-mono text-sm outline-none transition"
+            style={{ background: 'var(--c-bg)', border: '1px solid var(--c-border)', color: 'var(--c-text)' }}
             autoFocus
           />
-          {error && <p className="text-xs text-italian-red">{error}</p>}
+          {error && <p className="text-xs" style={{ color: 'var(--c-red)' }}>{error}</p>}
           <button
             type="submit"
             disabled={!value.trim()}
-            className="w-full py-3 bg-slate-900 text-white rounded-xl font-semibold hover:bg-italian-green transition-colors disabled:opacity-40"
+            className="w-full py-2 rounded-lg font-semibold text-sm transition-colors disabled:opacity-40"
+            style={{ background: 'var(--c-text)', color: '#fff' }}
           >
             {l === 'it' ? 'Salva' : 'Zapisz'}
           </button>
@@ -276,24 +481,57 @@ const ChangeKeyModal: React.FC<{ onClose: () => void; onSave: (key: string) => v
   );
 };
 
-// ─── Inner App (uses LangContext) ─────────────────────────────────────────────
+// ─── Inner App ────────────────────────────────────────────────────────────────
+
+const DIFF_LEVELS = ['A1', 'A2', 'B1', 'B2', 'C1'] as const;
 
 const AppInner: React.FC<{ apiKey: string; onChangeKey: () => void }> = ({ apiKey, onChangeKey }) => {
   const { globalLang, toggleGlobal } = useLang();
+  const { theme, toggleTheme } = useTheme();
 
   const [input, setInput] = useState('');
-  const [history, setHistory] = useState<Lesson[]>(() => {
-    try { return JSON.parse(localStorage.getItem('italian_app_history') || '[]'); }
-    catch { return []; }
-  });
+  const [history, setHistory] = useState<Lesson[]>([]);
+  const [historyLoaded, setHistoryLoaded] = useState(false);
   const [activeLesson, setActiveLesson] = useState<Lesson | null>(null);
   const [status, setStatus] = useState<'idle' | 'loading' | 'error'>('idle');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  const [activeModel, setActiveModel] = useState<string>(() => getSavedModel());
+  const [diffFilter, setDiffFilter] = useState<string | null>(null);
+  const [showFavsOnly, setShowFavsOnly] = useState(false);
+  const [favSet, setFavSet] = useState<Set<string>>(() => getFavorites());
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
+  // Wczytaj historię z pliku przy starcie
   useEffect(() => {
-    localStorage.setItem('italian_app_history', JSON.stringify(history));
-  }, [history]);
+    loadHistory().then(h => {
+      setHistory(h);
+      setHistoryLoaded(true);
+    });
+  }, []);
+
+  // Keyboard shortcuts on main page
+  useEffect(() => {
+    if (activeLesson) return;
+    const h = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
+      if (tag === 'input' || tag === 'textarea') return;
+      // '/' → focus search
+      if (e.key === '/') {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+      }
+      // 'r' or 'R' → random lesson
+      if (e.key === 'r' || e.key === 'R') {
+        if (history.length > 0) {
+          const rand = history[Math.floor(Math.random() * history.length)];
+          setActiveLesson(rand);
+        }
+      }
+    };
+    window.addEventListener('keydown', h);
+    return () => window.removeEventListener('keydown', h);
+  }, [activeLesson, history]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -301,7 +539,8 @@ const AppInner: React.FC<{ apiKey: string; onChangeKey: () => void }> = ({ apiKe
     setStatus('loading');
     setErrorMsg(null);
     try {
-      const lesson = await generateLesson(input, apiKey);
+      const lesson = await generateLesson(input, apiKey, activeModel);
+      await saveLesson(lesson);
       setHistory(prev => [lesson, ...prev]);
       setActiveLesson(lesson);
       setInput('');
@@ -312,21 +551,37 @@ const AppInner: React.FC<{ apiKey: string; onChangeKey: () => void }> = ({ apiKe
     }
   };
 
-  const deleteLesson = (e: React.MouseEvent, id: string) => {
+  const handleDelete = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
-    setHistory(prev => prev.filter(l => l.id !== id));
+    await deleteLesson(id);
+    setHistory(prev => prev.filter(lesson => lesson.id !== id));
     if (activeLesson?.id === id) setActiveLesson(null);
   };
 
-  const filteredHistory = search.trim()
-    ? history.filter(l =>
-        l.topic.pl.toLowerCase().includes(search.toLowerCase()) ||
-        l.topic.it.toLowerCase().includes(search.toLowerCase()) ||
-        l.tags?.some(t => t.toLowerCase().includes(search.toLowerCase()))
-      )
-    : history;
+  const handleToggleFav = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    toggleFavorite(id);
+    setFavSet(getFavorites());
+  };
 
-  // ── Active lesson view ──────────────────────────────────────────────────────
+  const handleModelChange = (modelId: string) => {
+    setActiveModel(modelId);
+    saveModel(modelId);
+  };
+
+  const filteredHistory = history.filter(lesson => {
+    if (diffFilter && lesson.difficulty_level !== diffFilter) return false;
+    if (showFavsOnly && !favSet.has(lesson.id)) return false;
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      return (
+        lesson.topic.pl.toLowerCase().includes(q) ||
+        lesson.topic.it.toLowerCase().includes(q) ||
+        lesson.tags?.some(t => t.toLowerCase().includes(q))
+      );
+    }
+    return true;
+  });
 
   if (activeLesson) {
     return (
@@ -338,157 +593,247 @@ const AppInner: React.FC<{ apiKey: string; onChangeKey: () => void }> = ({ apiKe
     );
   }
 
-  // ── Etykiety dwujęzyczne ─────────────────────────────────────────────────────
   const l = globalLang;
   const L = {
     headline:     l === 'it' ? 'Di cosa vuoi leggere oggi?' : 'O czym chcesz dzisiaj poczytać?',
-    subtitle:     l === 'it' ? 'Crea articoli, lezioni e approfondimenti culturali con l\'AI.' : 'Twórz artykuły, lekcje i opracowania kulturowe z AI.',
-    placeholder:  l === 'it' ? "Inserisci un argomento (es. 'Rinascimento', 'Caffè', 'Opera')…" : "Wpisz temat (np. 'Renesans', 'Kawa', 'Opera')…",
-    generating:   l === 'it' ? 'Generazione in corso — attendi…' : 'Generowanie lekcji — to może chwilę zająć…',
-    errorGen:     l === 'it' ? 'Impossibile generare l\'articolo. Controlla la chiave API e riprova.' : 'Nie udało się wygenerować artykułu. Sprawdź klucz API i spróbuj ponownie.',
+    subtitle:     l === 'it' ? "Crea articoli, lezioni e approfondimenti culturali con l'AI." : 'Twórz artykuły, lekcje i opracowania kulturowe z AI.',
+    placeholder:  l === 'it' ? "Argomento (es. 'Rinascimento', 'Caffè', 'Opera')…" : "Temat (np. 'Renesans', 'Kawa', 'Opera')…",
+    generating:   l === 'it' ? 'Generazione in corso…' : 'Generowanie — to może chwilę zająć…',
     yourArticles: l === 'it' ? 'I tuoi articoli' : 'Twoje artykuły',
     search:       l === 'it' ? 'Cerca…' : 'Szukaj…',
     noArticles:   l === 'it' ? 'Nessun articolo. Crea il tuo primo!' : 'Brak artykułów. Stwórz swój pierwszy!',
-    noArticlesSub:l === 'it' ? 'Inserisci un argomento — es. "Pizza", "Roma" o "Venezia"' : 'Wpisz temat powyżej — np. "Pizza", "Rzym" lub "Wenecja"',
+    noArticlesSub:l === 'it' ? 'Es. "Pizza", "Roma" o "Venezia"' : 'Np. "Pizza", "Rzym" lub "Wenecja"',
     noResults:    (q: string) => l === 'it' ? `Nessun risultato per "${q}"` : `Brak wyników dla "${q}"`,
-    langToggle:   l === 'it' ? 'Cambia lingua carte' : 'Przełącz język kart',
+    langToggle:   l === 'it' ? 'Cambia lingua' : 'Zmień język',
     apiKey:       l === 'it' ? 'Cambia chiave API' : 'Zmień klucz API',
   };
 
-  // ── Home / Library view ─────────────────────────────────────────────────────
-
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans">
+    <div className="min-h-screen font-sans" style={{ background: 'var(--c-bg)', color: 'var(--c-text)' }}>
       {/* Navbar */}
-      <nav className="w-full bg-white/80 backdrop-blur-md sticky top-0 z-50 border-b border-slate-200">
-        <div className="max-w-screen-2xl mx-auto px-4 h-16 flex items-center justify-between">
+      <nav className="glass-nav sticky top-0 z-50">
+        <div className="max-w-screen-2xl mx-auto px-4 h-12 flex items-center justify-between">
           <div className="flex items-center gap-2 cursor-pointer select-none" onClick={() => setActiveLesson(null)}>
             <div className="flex gap-1">
-              <div className="w-3 h-3 rounded-full bg-italian-green" />
-              <div className="w-3 h-3 rounded-full bg-white border border-slate-200" />
-              <div className="w-3 h-3 rounded-full bg-italian-red" />
+              <div className="w-2.5 h-2.5 rounded-full" style={{ background: 'var(--c-green)' }} />
+              <div className="w-2.5 h-2.5 rounded-full border" style={{ borderColor: 'var(--c-border)' }} />
+              <div className="w-2.5 h-2.5 rounded-full" style={{ background: 'var(--c-red)' }} />
             </div>
-            <span className="font-serif font-bold text-xl tracking-tight text-slate-900">
+            <span className="font-serif font-bold text-lg tracking-tight" style={{ color: 'var(--c-text)' }}>
               {l === 'it' ? 'Maestro Italiano AI' : 'Włoski Mistrz AI'}
             </span>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
+            <ModelPicker
+              apiKey={apiKey}
+              activeModel={activeModel}
+              onChange={handleModelChange}
+              lang={l}
+            />
             <button
               onClick={toggleGlobal}
               title={L.langToggle}
-              className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold rounded-full bg-slate-900 text-white hover:bg-italian-green transition-all shadow-sm active:scale-95"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-full transition-all active:scale-95"
+              style={{ background: 'var(--c-text)', color: theme === 'dark' ? '#13151b' : '#fff' }}
             >
-              <LanguageIcon className="w-3.5 h-3.5" />
+              <LanguageIcon className="w-3 h-3" />
               {l === 'it' ? '🇮🇹 IT' : '🇵🇱 PL'}
+            </button>
+            {/* Przełącznik motywu */}
+            <button
+              onClick={toggleTheme}
+              title={theme === 'dark' ? 'Tryb jasny' : 'Tryb ciemny'}
+              className="theme-toggle"
+            >
+              {theme === 'dark'
+                ? <SunIcon className="w-4 h-4 theme-icon-enter" />
+                : <MoonIcon className="w-4 h-4 theme-icon-enter" />
+              }
             </button>
             <button
               onClick={onChangeKey}
               title={L.apiKey}
-              className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
+              className="p-2 rounded-lg"
+              style={{ color: 'var(--c-faint)' }}
             >
-              <KeyIcon className="w-4 h-4" />
+              <KeyIcon className="w-3.5 h-3.5" />
             </button>
           </div>
         </div>
       </nav>
 
-      <main className="px-4 py-10">
-        <div className="max-w-screen-2xl mx-auto space-y-14">
+      <main className="px-4 py-8">
+        <div className="max-w-screen-2xl mx-auto space-y-10">
 
           {/* Hero */}
-          <div className="text-center space-y-8 py-6 md:py-12">
-            <div className="space-y-4">
-              <h1 className="text-4xl md:text-6xl font-serif font-bold text-slate-900 tracking-tight leading-tight">
-                <span className="bg-clip-text text-transparent bg-gradient-to-r from-italian-green via-emerald-600 to-teal-700">
-                  {L.headline}
-                </span>
+          <div className="text-center space-y-5 py-4 md:py-8">
+            <div className="space-y-2">
+              <h1 className="text-3xl md:text-5xl font-serif font-bold tracking-tight leading-tight">
+                <span className="hero-gradient">{L.headline}</span>
               </h1>
-              <p className="text-lg text-slate-500 max-w-lg mx-auto font-light">
+              <p className="text-sm font-light max-w-md mx-auto" style={{ color: 'var(--c-muted)' }}>
                 {L.subtitle}
               </p>
             </div>
 
-            <form onSubmit={handleSubmit} className="relative max-w-xl mx-auto w-full group">
-              <div className="absolute -inset-1 bg-gradient-to-r from-italian-green via-emerald-400 to-teal-500 rounded-2xl blur opacity-20 group-hover:opacity-40 transition duration-500" />
-              <div className="relative flex items-center bg-white rounded-xl shadow-2xl">
+            <form onSubmit={handleSubmit} className="relative max-w-lg mx-auto w-full group">
+              <div className="absolute -inset-0.5 bg-gradient-to-r from-emerald-400 to-teal-500 rounded-xl blur opacity-15 group-hover:opacity-30 transition duration-500" />
+              <div className="relative flex items-center rounded-xl shadow-lg" style={{ background: 'var(--c-surface)' }}>
                 <input
                   type="text"
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   placeholder={L.placeholder}
-                  className="w-full px-6 py-5 rounded-xl bg-transparent border-0 focus:ring-0 text-lg placeholder:text-slate-400 text-slate-800 outline-none"
+                  className="w-full px-4 py-3 rounded-xl bg-transparent border-0 focus:ring-0 text-sm placeholder:text-slate-400 outline-none"
+                  style={{ color: 'var(--c-text)' }}
                   disabled={status === 'loading'}
                 />
                 <button
                   type="submit"
                   disabled={status === 'loading' || !input.trim()}
-                  className="absolute right-2 p-3 bg-slate-900 text-white rounded-lg hover:bg-italian-green transition-colors disabled:opacity-50 disabled:hover:bg-slate-900"
+                  className="absolute right-1.5 p-2 rounded-lg transition-colors disabled:opacity-50"
+                  style={{ background: 'var(--c-text)', color: '#fff' }}
                 >
                   {status === 'loading'
-                    ? <SparklesIcon className="w-6 h-6 animate-spin" />
-                    : <PlusIcon className="w-6 h-6" />
+                    ? <SparklesIcon className="w-4 h-4 animate-spin" />
+                    : <PlusIcon className="w-4 h-4" />
                   }
                 </button>
               </div>
             </form>
 
             {status === 'loading' && (
-              <div className="flex items-center justify-center gap-3 text-sm text-slate-500 animate-pulse">
-                <SparklesIcon className="w-4 h-4 text-italian-green" />
+              <div className="flex items-center justify-center gap-2 text-xs animate-pulse" style={{ color: 'var(--c-muted)' }}>
+                <SparklesIcon className="w-3.5 h-3.5" style={{ color: 'var(--c-green)' }} />
                 {L.generating}
               </div>
             )}
-
             {status === 'error' && (
-              <div className="text-italian-red bg-red-50 px-4 py-3 rounded-xl border border-red-100 inline-block text-sm font-medium animate-fade-in">
-                {L.errorGen}
+              <div className="inline-block text-xs font-medium px-3 py-2 rounded-lg animate-fade-in"
+                style={{ background: '#fef2f2', color: 'var(--c-red)', border: '1px solid #fecaca' }}>
+                {errorMsg}
               </div>
             )}
           </div>
 
           {/* Library */}
-          <div className="space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center gap-3 border-b border-slate-200 pb-4">
-              <div className="flex items-center gap-2">
-                <BookOpenIcon className="w-5 h-5 text-slate-400" />
-                <h2 className="text-lg font-bold text-slate-700 uppercase tracking-wide">
+          <div className="space-y-4">
+            {/* Library header row */}
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2 pb-3"
+              style={{ borderBottom: '1px solid var(--c-border)' }}>
+              <div className="flex items-center gap-2 flex-wrap">
+                <BookOpenIcon className="w-4 h-4" style={{ color: 'var(--c-faint)' }} />
+                <h2 className="text-sm font-bold uppercase tracking-wide" style={{ color: 'var(--c-muted)' }}>
                   {L.yourArticles}
                 </h2>
-                <span className="text-xs text-slate-400 font-normal">({history.length})</span>
+                <span className="text-xs" style={{ color: 'var(--c-faint)' }}>
+                  ({filteredHistory.length}{filteredHistory.length !== history.length ? `/${history.length}` : ''})
+                </span>
+                {/* Random lesson button */}
+                {history.length > 1 && (
+                  <button
+                    onClick={() => { const r = history[Math.floor(Math.random() * history.length)]; setActiveLesson(r); }}
+                    className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold border transition-all"
+                    style={{ background: 'var(--c-bg)', border: '1px solid var(--c-border)', color: 'var(--c-muted)' }}
+                    title={(l === 'it' ? 'Articolo casuale' : 'Losowa lekcja') + ' [R]'}
+                  >
+                    <ArrowPathIcon className="w-3 h-3" />
+                    {l === 'it' ? 'Casuale' : 'Losowa'}
+                  </button>
+                )}
+                {/* Favorites filter */}
+                {history.length > 0 && favSet.size > 0 && (
+                  <button
+                    onClick={() => setShowFavsOnly(v => !v)}
+                    className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold border transition-all ${showFavsOnly ? 'active' : ''}`}
+                    style={showFavsOnly
+                      ? { background: 'rgba(245,158,11,.12)', color: '#d97706', border: '1px solid rgba(245,158,11,.35)' }
+                      : { background: 'var(--c-bg)', border: '1px solid var(--c-border)', color: 'var(--c-muted)' }
+                    }
+                    title={l === 'it' ? 'Solo preferiti' : 'Tylko ulubione'}
+                  >
+                    {showFavsOnly ? <StarIcon className="w-3 h-3" /> : <StarOutlineIcon className="w-3 h-3" />}
+                    {l === 'it' ? 'Preferiti' : 'Ulubione'}
+                  </button>
+                )}
               </div>
-              {history.length > 3 && (
-                <div className="sm:ml-auto relative">
-                  <MagnifyingGlassIcon className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                  <input
-                    type="text"
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    placeholder={L.search}
-                    className="pl-9 pr-4 py-2 rounded-xl border border-slate-200 bg-white text-sm text-slate-700 focus:ring-2 focus:ring-italian-green/30 outline-none transition w-52"
-                  />
-                </div>
-              )}
+              <div className="sm:ml-auto flex items-center gap-2 flex-wrap">
+                {history.length > 3 && (
+                  <div className="relative">
+                    <MagnifyingGlassIcon className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2" style={{ color: 'var(--c-faint)' }} />
+                    <input
+                      ref={searchInputRef}
+                      type="text"
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                      placeholder={L.search + ' [/]'}
+                      className="pl-8 pr-3 py-1.5 rounded-lg text-xs outline-none transition w-44"
+                      style={{ background: 'var(--c-surface)', border: '1px solid var(--c-border)', color: 'var(--c-text)' }}
+                    />
+                  </div>
+                )}
+              </div>
             </div>
 
-            {history.length === 0 ? (
-              <div className="text-center py-24 bg-white rounded-3xl border-2 border-dashed border-slate-200 text-slate-400 space-y-2">
-                <p className="text-4xl">🇮🇹</p>
-                <p className="font-medium">{L.noArticles}</p>
-                <p className="text-sm">{L.noArticlesSub}</p>
+            {/* Difficulty filter pills */}
+            {history.length > 2 && (
+              <div className="flex flex-wrap gap-1.5">
+                <button
+                  onClick={() => setDiffFilter(null)}
+                  className={`diff-pill ${diffFilter === null ? 'active' : ''}`}
+                >
+                  {l === 'it' ? 'Tutti' : 'Wszystkie'}
+                </button>
+                {DIFF_LEVELS.filter(d => history.some(lesson => lesson.difficulty_level === d)).map(d => (
+                  <button
+                    key={d}
+                    onClick={() => setDiffFilter(prev => prev === d ? null : d)}
+                    className={`diff-pill ${diffFilter === d ? 'active' : ''}`}
+                  >
+                    {d}
+                    <span className="ml-1 opacity-70 font-normal text-[9px]">
+                      {DIFF_LABELS[d]?.[l] ?? ''}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {!historyLoaded ? (
+              <div className="text-center py-12 text-xs animate-pulse" style={{ color: 'var(--c-faint)' }}>
+                <SparklesIcon className="w-4 h-4 mx-auto mb-2" style={{ color: 'var(--c-green)' }} />
+                {l === 'it' ? 'Caricamento biblioteca…' : 'Wczytywanie biblioteki…'}
+              </div>
+            ) : history.length === 0 ? (
+              <div className="text-center py-16 rounded-2xl border-2 border-dashed space-y-1.5"
+                style={{ borderColor: 'var(--c-border)', color: 'var(--c-faint)' }}>
+                <p className="text-3xl">🇮🇹</p>
+                <p className="font-medium text-sm">{L.noArticles}</p>
+                <p className="text-xs">{L.noArticlesSub}</p>
               </div>
             ) : filteredHistory.length === 0 ? (
-              <div className="text-center py-16 text-slate-400">
-                <p>{L.noResults(search)}</p>
+              <div className="text-center py-12 text-sm space-y-1" style={{ color: 'var(--c-faint)' }}>
+                {search.trim() ? L.noResults(search) : (l === 'it' ? 'Nessun articolo corrisponde ai filtri.' : 'Brak artykułów spełniających filtry.')}
+                {(diffFilter || showFavsOnly) && (
+                  <div>
+                    <button onClick={() => { setDiffFilter(null); setShowFavsOnly(false); setSearch(''); }}
+                      className="text-xs underline mt-1" style={{ color: 'var(--c-green)' }}>
+                      {l === 'it' ? 'Azzera filtri' : 'Wyczyść filtry'}
+                    </button>
+                  </div>
+                )}
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                 {filteredHistory.map((lesson) => (
                   <LessonCard
                     key={lesson.id}
                     lesson={lesson}
                     lang={globalLang}
                     onOpen={() => setActiveLesson(lesson)}
-                    onDelete={(e) => deleteLesson(e, lesson.id)}
+                    onDelete={(e) => handleDelete(e, lesson.id)}
+                    isFav={favSet.has(lesson.id)}
+                    onToggleFav={(e) => handleToggleFav(e, lesson.id)}
                   />
                 ))}
               </div>
@@ -497,8 +842,20 @@ const AppInner: React.FC<{ apiKey: string; onChangeKey: () => void }> = ({ apiKe
         </div>
       </main>
 
-      <footer className="py-10 text-center text-slate-400 text-sm border-t border-slate-200/50 mt-8 bg-white/50">
-        <p>{l === 'it' ? 'Maestro Italiano AI' : 'Włoski Mistrz AI'} &copy; 2025 · Powered by OpenRouter</p>
+      <footer className="py-5 border-t"
+        style={{ color: 'var(--c-faint)', borderColor: 'var(--c-border)', background: 'var(--c-surface-2)' }}>
+        <div className="max-w-screen-2xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
+          <span className="text-xs">
+            {l === 'it' ? 'Maestro Italiano AI' : 'Włoski Mistrz AI'} &copy; 2025 · Powered by OpenRouter
+          </span>
+          {history.length > 0 && (
+            <div className="flex items-center gap-2 text-[10px]">
+              <span style={{ color: 'var(--c-faint)' }}>{l === 'it' ? 'Scorciatoie:' : 'Skróty:'}</span>
+              <span className="kbd">/</span><span>{l === 'it' ? 'cerca' : 'szukaj'}</span>
+              <span className="kbd">R</span><span>{l === 'it' ? 'casuale' : 'losowa'}</span>
+            </div>
+          )}
+        </div>
       </footer>
     </div>
   );

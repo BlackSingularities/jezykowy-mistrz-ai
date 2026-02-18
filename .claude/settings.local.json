@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dir:*)",
+      "Bash(npx tsc:*)",
+      "Bash(del \"H:\\\\Piaskownica\\\\!!Githubownik\\\\wloski-mistrz-ai\\\\components\\\\QuizSection.tsx\")"
+    ]
+  }
+}

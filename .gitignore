@@ -31,3 +31,7 @@ pnpm-debug.log*
 
 # TypeScript cache
 *.tsbuildinfo
+
+# Historia lekcji użytkownika (dane lokalne, nie kod)
+history.json
+history/
