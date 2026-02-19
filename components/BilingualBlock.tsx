@@ -59,14 +59,14 @@ export function BilingualBlock<T extends ElementType = 'span'>({
 
   const text = localLang === 'pl'
     ? content.pl
-    : (targetLang === 'en' ? content.en : content.it) ?? content.pl;
+    : (targetLang === 'en' ? content.en : targetLang === 'fr' ? content.fr : content.it) ?? content.pl;
   const Tag = (as ?? 'span') as ElementType;
 
   const tooltip = noClick
     ? undefined
     : localLang !== 'pl'
       ? 'Kliknij → Polski'
-      : targetLang === 'en' ? 'Click → English' : 'Clicca → Italiano';
+      : targetLang === 'en' ? 'Click → English' : targetLang === 'fr' ? 'Cliquez → Français' : 'Clicca → Italiano';
 
   return (
     <Tag

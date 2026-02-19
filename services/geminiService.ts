@@ -872,3 +872,268 @@ CRITICAL: Respond with ONLY a raw JSON object in this exact format:
     return [];
   }
 };
+
+// ─── Generate French Lesson ───────────────────────────────────────────────────
+
+export const generateFrenchLesson = async (topic: string, apiKey: string, model?: string): Promise<Lesson> => {
+  const client = new OpenAI({
+    baseURL: "https://openrouter.ai/api/v1",
+    apiKey,
+    dangerouslyAllowBrowser: true,
+  });
+
+  const response = await client.chat.completions.create({
+    model: model || getSavedModel() || DEFAULT_MODEL,
+    messages: [
+      {
+        role: "system",
+        content: `You are a world-class bilingual (French/Polish) editorial expert, cultural authority, and master language educator with 30 years of experience teaching French to Polish speakers.
+
+You produce premium, literary-quality learning resources that feel like an issue of a prestigious culture magazine combined with a rigorous academic reference.
+
+Your guiding principles:
+— DEPTH over brevity: every field must be thorough, substantive, and information-dense. Short answers are a failure.
+— CULTURAL AUTHENTICITY: French-speaking world is diverse — mention France, Belgium, Switzerland, Quebec, and Francophone Africa where relevant.
+— LINGUISTIC PRECISION: distinguish registers, connotations, and pragmatic constraints scrupulously.
+— POLISH SPEAKER FOCUS: always identify specifically which Polish structures or words cause interference.
+— LITERARY QUALITY: your French must be native, varied, and beautiful. Your Polish must be elegant and precise.
+— MEMORABILITY: every explanation, example, and note should be crafted so a learner will never forget it.
+
+CRITICAL LENGTH REQUIREMENTS — enforce these strictly:
+• introduction: ≥ 6 sentences per language
+• vocabulary definitions: ≥ 2–3 sentences per language each
+• grammar explanations: ≥ 5 sentences per language each
+• grammar examples: ≥ 4 example pairs per grammar point
+• common_mistakes explanations: ≥ 3–4 sentences per language each
+
+• deep_dive: ≥ 250 words per language — in-depth analytical/narrative feature
+• culture content: ≥ 250 words per language
+• cultural_notes content: ≥ 3 sentences per language each
+• mini_story text: ≥ 200 words per language
+• dialogue: ≥ 16 lines total, each utterance 1–3 sentences
+• closing_reflection: ≥ 200 words per language — synthesising closing essay
+• proverb meaning: ≥ 4 sentences per language
+• idiom meaning + origin: ≥ 3 sentences each per language
+
+IMPORTANT: All bilingual fields use "fr" (not "it" or "en") for the French content, and "pl" for Polish.
+DO NOT produce shortened, telegraphic, or bullet-point-style content in any field that requests prose.`,
+      },
+      {
+        role: "user",
+        content: `Create a comprehensive, premium bilingual (French–Polish) learning resource on the topic: "${topic}".
+
+Target audience: Polish adults learning French (B1–B2 level).
+Tone: Engaging, magazine-quality, culturally immersive, intellectually serious.
+
+MANDATORY requirements — failure to meet ANY of these is unacceptable:
+1. ALL prose fields must be long and substantive.
+2. ALL explanations and prose must be provided in BOTH French and Polish — every "Bilingual" field has "fr" and "pl" keys (NOT "it" or "en").
+3. DO NOT include a "vocabulary" field — vocabulary is generated separately.
+4. Grammar: 3 sections minimum, each with ≥ 5-sentence explanations and ≥ 4 example pairs.
+5. Common mistakes: SPECIFIC to Polish speakers — name the Polish word causing interference. ≥ 5 mistakes total.
+6. Mini-story: ≥ 200 words per language, literary quality, named characters set in a French-speaking country.
+7. Dialogue: ≥ 16 lines, authentic native French, multi-sentence utterances, grammar notes on ≥ 6 lines.
+8. Culture content: ≥ 250 words per language — historical depth, regional specifics, contemporary relevance (French vs Belgian vs Quebec perspective where relevant).
+9. Cultural notes: 3–4 notes, each ≥ 3 sentences per language.
+10. Proverb: must be a REAL French proverb. Meaning field ≥ 4 sentences per language.
+11. Idiom: genuine French idiom ("expression idiomatique"). Origin story required (≥ 3 sentences per language).
+12. Phrases: 8 items, each with detailed context ≥ 2–3 sentences per language.
+13. deep_dive_title: concise encyclopedic section title (3–7 words). deep_dive: ≥ 250 words per language — authoritative, encyclopedic analysis. NO "lesson/journey" framing.
+14. closing_reflection_title: concise encyclopedic section title. closing_reflection: ≥ 200 words per language — scholarly synthesis. NO "lesson/journey" framing.
+
+CRITICAL — You MUST respond with a single valid JSON object. No markdown, no code fences, no extra text — ONLY the raw JSON.
+
+Use "fr" key (not "it" or "en") for French content in all Bilingual fields. Do NOT include a "vocabulary" field:
+{
+  "topic": {"fr": "...", "pl": "..."},
+  "subtitle": {"fr": "...", "pl": "..."},
+  "emoji": "🇫🇷",
+  "tags": ["tag1", "tag2", "tag3"],
+  "difficulty_level": "B1",
+  "estimated_reading_minutes": 12,
+  "introduction": {"fr": "...", "pl": "..."},
+  "key_takeaways": [{"fr": "...", "pl": "..."}, {"fr": "...", "pl": "..."}, {"fr": "...", "pl": "..."}],
+  "trivia": {"fr": "...", "pl": "..."},
+  "regional_notes": {"fr": "...", "pl": "..."},
+  "deep_dive_title": {"fr": "...", "pl": "..."},
+  "deep_dive": {"fr": "...", "pl": "..."},
+  "grammar": [
+    {
+      "title": {"fr": "...", "pl": "..."},
+      "explanation": {"fr": "...", "pl": "..."},
+      "pattern": "...",
+      "examples": [{"fr": "...", "pl": "...", "breakdown": "..."}],
+      "exceptions": [{"fr": "...", "pl": "..."}]
+    }
+  ],
+  "common_mistakes": [
+    {
+      "category": "false_friend|grammar|pronunciation|usage|spelling",
+      "wrong": "...", "correct": "...",
+      "explanation": {"fr": "...", "pl": "..."},
+      "mnemonic": {"fr": "...", "pl": "..."}
+    }
+  ],
+  "useful_phrases": [
+    {
+      "expression": "...", "translation": "...",
+      "register": "formal|informal|colloquial|literary|regional|vulgar",
+      "context": {"fr": "...", "pl": "..."},
+      "example_usage": {"fr": "...", "pl": "..."}
+    }
+  ],
+  "mini_story": {
+    "title": {"fr": "...", "pl": "..."},
+    "text": {"fr": "...", "pl": "..."},
+    "moral": {"fr": "...", "pl": "..."}
+  },
+  "dialogue": {
+    "title": {"fr": "...", "pl": "..."},
+    "setting": {"fr": "...", "pl": "..."},
+    "lines": [
+      {
+        "speaker": "...", "text": {"fr": "...", "pl": "..."},
+        "tone": "neutral|happy|surprised|formal|casual|ironic|questioning|emphatic",
+        "annotation": {"fr": "...", "pl": "..."},
+        "grammar_note": {"fr": "...", "pl": "..."}
+      }
+    ],
+    "vocabulary_highlight": ["...", "..."]
+  },
+  "closing_reflection_title": {"fr": "...", "pl": "..."},
+  "closing_reflection": {"fr": "...", "pl": "..."},
+  "culture": {
+    "title": {"fr": "...", "pl": "..."},
+    "content": {"fr": "...", "pl": "..."},
+    "did_you_know": {"fr": "...", "pl": "..."}
+  },
+  "cultural_notes": [
+    {
+      "icon": "🎭",
+      "title": {"fr": "...", "pl": "..."},
+      "content": {"fr": "...", "pl": "..."},
+      "region": "..."
+    }
+  ],
+  "proverb": {
+    "text": "...",
+    "translation": {"fr": "...", "pl": "..."},
+    "meaning": {"fr": "...", "pl": "..."}
+  },
+  "idiom": {
+    "phrase": "...",
+    "literal": {"fr": "...", "pl": "..."},
+    "meaning": {"fr": "...", "pl": "..."},
+    "origin": {"fr": "...", "pl": "..."},
+    "example_sentence": {"fr": "...", "pl": "..."}
+  }
+}
+
+Remember: this resource must be so good that a learner could use it as their primary reference for this topic.`,
+      },
+    ],
+    response_format: { type: "json_object" },
+  });
+
+  const text = response.choices[0]?.message?.content;
+  if (!text) throw new Error("Empty response from API");
+
+  const data = JSON.parse(text);
+
+  // Generate vocabulary as a separate request with full lesson context
+  const vocabulary = await generateFrenchVocabulary(data, apiKey, model || getSavedModel() || DEFAULT_MODEL, client);
+
+  return {
+    ...data,
+    vocabulary,
+    id: typeof crypto !== "undefined" && crypto.randomUUID
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+    timestamp: Date.now(),
+    targetLang: 'fr' as const,
+  };
+};
+
+// ─── French Vocabulary Generation ─────────────────────────────────────────────
+
+async function generateFrenchVocabulary(
+  lessonData: Record<string, unknown>,
+  apiKey: string,
+  model: string,
+  client?: OpenAI
+): Promise<import('../types').VocabularyItem[]> {
+  const c = client ?? new OpenAI({ baseURL: "https://openrouter.ai/api/v1", apiKey, dangerouslyAllowBrowser: true });
+
+  const lessonSummary = JSON.stringify({
+    topic: lessonData.topic,
+    tags: lessonData.tags,
+    difficulty_level: lessonData.difficulty_level,
+    introduction: lessonData.introduction,
+    deep_dive: lessonData.deep_dive,
+    grammar: lessonData.grammar,
+    mini_story: lessonData.mini_story,
+    dialogue: lessonData.dialogue,
+  });
+
+  const response = await c.chat.completions.create({
+    model,
+    messages: [
+      {
+        role: "system",
+        content: `You are a specialist French lexicographer and vocabulary teacher for Polish speakers. You create precise, detailed, encyclopedic vocabulary entries for language learners. Your entries are accurate, pedagogically rich, and directly relevant to the topic at hand.`,
+      },
+      {
+        role: "user",
+        content: `Based on the following French lesson content, generate a vocabulary list of EXACTLY 15 to 25 items (no fewer than 15, no more than 25). Choose the most important, topic-relevant French words and phrases — a mix of nouns, verbs, adjectives, adverbs, and set phrases. Prioritise words that actually appear or are strongly implied in the lesson text.
+
+LESSON CONTENT:
+${lessonSummary}
+
+For each vocabulary item provide:
+- word: the French word/phrase
+- ipa: full IPA phonetic transcription
+- gender: "m", "f", "pl", or "invariant" (for nouns)
+- plural: plural form (for nouns)
+- part_of_speech: one of noun|verb|adjective|adverb|phrase|interjection|conjunction|preposition
+- register: one of formal|informal|colloquial|literary|regional|vulgar
+- translation: Polish translation (primary meaning, with nuances noted)
+- definition: {"fr": "2–3 sentence definition in French explaining usage and nuances", "pl": "2–3 sentence definition in Polish"}
+- context_sentence: {"fr": "A vivid, culturally specific French example sentence", "pl": "Polish translation of the sentence"}
+- audio_hint: pronunciation tip for Polish speakers (e.g. "ou = /u/, jak polskie 'u' — nie wymawiaj jak 'ou' w polskim")
+- etymology: {"fr": "2+ sentence etymology in French", "pl": "2+ sentence etymology in Polish"}
+- synonyms: array of 3–4 French synonyms with register notes
+- antonyms: array of 2–3 French antonyms (if applicable)
+- word_family: array of 3–4 related forms: [{"form": "...", "type": "noun/verb/adj", "translation": "Polish gloss"}]
+
+CRITICAL: Respond with ONLY a raw JSON object in this exact format:
+{
+  "vocabulary": [
+    {
+      "word": "...", "ipa": "...", "gender": "m|f|pl|invariant", "plural": "...",
+      "part_of_speech": "noun|verb|...",
+      "register": "formal|informal|...",
+      "translation": "...",
+      "definition": {"fr": "...", "pl": "..."},
+      "context_sentence": {"fr": "...", "pl": "..."},
+      "audio_hint": "...",
+      "etymology": {"fr": "...", "pl": "..."},
+      "synonyms": ["...", "..."],
+      "antonyms": ["...", "..."],
+      "word_family": [{"form": "...", "type": "...", "translation": "..."}]
+    }
+  ]
+}`,
+      },
+    ],
+    response_format: { type: "json_object" },
+  });
+
+  const vocabText = response.choices[0]?.message?.content;
+  if (!vocabText) return [];
+  try {
+    const parsed = JSON.parse(vocabText);
+    return parsed.vocabulary ?? [];
+  } catch {
+    return [];
+  }
+}
