@@ -1,11 +1,12 @@
 // ─── Primitives ───────────────────────────────────────────────────────────────
 
-export type Lang = 'it' | 'pl' | 'en';
-export type TargetLang = 'it' | 'en'; // język docelowy nauki
+export type Lang = 'it' | 'pl' | 'en' | 'fr';
+export type TargetLang = 'it' | 'en' | 'fr'; // język docelowy nauki
 
 export interface Bilingual {
   it?: string;
   en?: string;
+  fr?: string;
   pl: string;
 }
 
@@ -47,6 +48,7 @@ export interface VocabularyItem {
 export interface GrammarExample {
   it?: string;
   en?: string;
+  fr?: string;
   pl: string;
   breakdown?: string;               // e.g. "soggetto + ausiliare + participio"
 }
@@ -114,7 +116,7 @@ export interface Lesson {
   // meta
   id: string;
   timestamp: number;
-  targetLang?: TargetLang; // 'it' (domyślnie) lub 'en'
+  targetLang?: TargetLang; // 'it' (domyślnie), 'en' lub 'fr'
   emoji: string;
   topic: Bilingual;
   subtitle: Bilingual;              // magazine-style deck subtitle
