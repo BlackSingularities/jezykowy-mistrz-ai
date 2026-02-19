@@ -87,7 +87,7 @@
       body {
         background: var(--c-bg);
         color: var(--c-text);
-        font-size: var(--font-base);
+        font-size: inherit;
         font-family: 'DM Sans', sans-serif;
         transition: background .3s ease, color .3s ease;
       }
@@ -195,8 +195,8 @@
         display: flex;
         align-items: flex-start;
         gap: var(--sp-3);
-        padding-bottom: var(--sp-4);
-        margin-bottom: var(--sp-5);
+        padding-bottom: var(--sp-2);
+        margin-bottom: var(--sp-2);
         border-bottom: 1px solid var(--c-border-soft);
       }
       .section-heading-icon {
@@ -540,7 +540,53 @@
         box-shadow: 0 1px 0 var(--c-border);
         line-height: 1;
       }
+
+      /* ── Nav icon button (unified) ───────────────────────────────── */
+      .nav-icon-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 32px;
+        height: 32px;
+        border-radius: 999px;
+        border: 1px solid var(--c-border);
+        background: var(--c-surface);
+        color: var(--c-muted);
+        cursor: pointer;
+        transition: background .15s, color .15s, border-color .15s, transform .1s;
+        flex-shrink: 0;
+        font-family: 'DM Sans', sans-serif;
+        font-weight: 600;
+      }
+      .nav-icon-btn:hover:not(:disabled) { background: var(--c-bg); color: var(--c-text); border-color: var(--c-faint); }
+      .nav-icon-btn:active:not(:disabled) { transform: scale(.93); }
+      .nav-icon-btn:disabled { opacity: .3; cursor: not-allowed; }
+      .nav-icon-btn.fav-active { color: #f59e0b; border-color: rgba(245,158,11,.4); background: rgba(245,158,11,.08); }
+
+      /* ── Justified text blocks ───────────────────────────────────── */
+      .text-justify-block {
+        text-align: justify;
+        hyphens: auto;
+        hyphenate-limit-chars: 6 3 3;
+      }
+
+      /* ── Emoji flag fix (Windows) ────────────────────────────────── */
+      .flag-emoji {
+        font-family: "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif;
+        font-style: normal;
+        line-height: 1;
+        display: inline-block;
+      }
     </style>
+  <script>
+    // Apply saved font size before React mounts to avoid flash
+    (function() {
+      var sizes = [13, 15, 17, 19, 22];
+      var saved = parseInt(localStorage.getItem('app_fontsize') || '1', 10);
+      var idx = (saved >= 0 && saved <= 4) ? saved : 1;
+      document.documentElement.style.fontSize = sizes[idx] + 'px';
+    })();
+  </script>
   <script type="importmap">
 {
   "imports": {

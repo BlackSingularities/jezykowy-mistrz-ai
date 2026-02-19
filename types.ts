@@ -1,9 +1,11 @@
 // ─── Primitives ───────────────────────────────────────────────────────────────
 
-export type Lang = 'it' | 'pl';
+export type Lang = 'it' | 'pl' | 'en';
+export type TargetLang = 'it' | 'en'; // język docelowy nauki
 
 export interface Bilingual {
-  it: string;
+  it?: string;
+  en?: string;
   pl: string;
 }
 
@@ -42,7 +44,8 @@ export interface VocabularyItem {
 // ─── Grammar ─────────────────────────────────────────────────────────────────
 
 export interface GrammarExample {
-  it: string;
+  it?: string;
+  en?: string;
   pl: string;
   breakdown?: string;               // e.g. "soggetto + ausiliare + participio"
 }
@@ -110,6 +113,7 @@ export interface Lesson {
   // meta
   id: string;
   timestamp: number;
+  targetLang?: TargetLang; // 'it' (domyślnie) lub 'en'
   emoji: string;
   topic: Bilingual;
   subtitle: Bilingual;              // magazine-style deck subtitle
@@ -174,6 +178,10 @@ export interface Lesson {
   // extras
   trivia?: Bilingual;
   regional_notes?: Bilingual;
+
+  // deep reading blocks — two extended thematic prose sections
+  deep_dive?: Bilingual;          // after vocabulary: in-depth thematic exploration
+  closing_reflection?: Bilingual; // after dialogue: reflective / narrative closing
 }
 
 // ─── App State ────────────────────────────────────────────────────────────────

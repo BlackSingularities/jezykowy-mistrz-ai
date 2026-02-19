@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useRef, FormEvent } from 'react';
+import React, { useState, useEffect, useRef, useCallback, FormEvent } from 'react';
 import { createRoot } from 'react-dom/client';
-import { generateLesson, loadModels, getSavedModel, saveModel, DEFAULT_MODEL, ORModel } from './services/geminiService';
+import { generateLesson, generateEnglishLesson, loadModels, getSavedModel, saveModel, ORModel } from './services/geminiService';
 import { LessonView, getFavorites, toggleFavorite } from './components/LessonView';
-import { LangProvider, useLang, useTheme } from './context/LangContext';
-import { Lesson } from './types';
+import { LangProvider, useLang, useTheme, useFontSize } from './context/LangContext';
+import { Flag, LangFlag } from './components/Flag';
+import { Lesson, TargetLang } from './types';
 import {
   SparklesIcon,
   TrashIcon,
@@ -16,11 +17,27 @@ import {
   ChevronDownIcon,
   CpuChipIcon,
   StarIcon,
+  CheckCircleIcon,
+  ExclamationCircleIcon,
 } from '@heroicons/react/24/solid';
-import { LanguageIcon, SunIcon, MoonIcon, ArrowPathIcon, StarIcon as StarOutlineIcon } from '@heroicons/react/24/outline';
+import { LanguageIcon, SunIcon, MoonIcon, ArrowPathIcon, StarIcon as StarOutlineIcon, ArrowLeftIcon } from '@heroicons/react/24/outline';
+
+// ─── Queue types ──────────────────────────────────────────────────────────────
+
+type QueueStatus = 'pending' | 'running' | 'done' | 'error';
+
+interface QueueItem {
+  qid: string;       // unique queue id
+  topic: string;
+  status: QueueStatus;
+  lessonId?: string; // set when done
+  error?: string;
+  startedAt?: number;
+}
 
 const API_KEY_STORAGE = 'openrouter_api_key';
 const HISTORY_KEY    = 'italian_app_history'; // localStorage fallback key
+const APP_MODE_KEY   = 'app_mode'; // 'it' | 'en'
 
 // ─── History persistence: osobne pliki ───────────────────────────────────────
 
@@ -82,12 +99,12 @@ const DIFF_GRADIENT: Record<string, string> = {
   C1: 'from-violet-500 to-purple-700',
 };
 
-const DIFF_LABELS: Record<string, { pl: string; it: string }> = {
-  A1: { pl: 'Początkujący',        it: 'Principiante' },
-  A2: { pl: 'Elementarny',         it: 'Elementare' },
-  B1: { pl: 'Średniozaawansowany', it: 'Intermedio' },
-  B2: { pl: 'Wyższy średni',       it: 'Intermedio sup.' },
-  C1: { pl: 'Zaawansowany',        it: 'Avanzato' },
+const DIFF_LABELS: Record<string, { pl: string; it: string; en: string }> = {
+  A1: { pl: 'Początkujący',        it: 'Principiante',    en: 'Beginner' },
+  A2: { pl: 'Elementarny',         it: 'Elementare',      en: 'Elementary' },
+  B1: { pl: 'Średniozaawansowany', it: 'Intermedio',      en: 'Intermediate' },
+  B2: { pl: 'Wyższy średni',       it: 'Intermedio sup.', en: 'Upper-Intermediate' },
+  C1: { pl: 'Zaawansowany',        it: 'Avanzato',        en: 'Advanced' },
 };
 
 // ─── ModelPicker ──────────────────────────────────────────────────────────────
@@ -96,7 +113,7 @@ const ModelPicker: React.FC<{
   apiKey: string;
   activeModel: string;
   onChange: (modelId: string) => void;
-  lang: 'it' | 'pl';
+  lang: 'it' | 'pl' | 'en';
 }> = ({ apiKey, activeModel, onChange, lang }) => {
   const [open, setOpen] = useState(false);
   const [models, setModels] = useState<ORModel[]>([]);
@@ -125,7 +142,7 @@ const ModelPicker: React.FC<{
       // sortuj: darmowe/popularne najpierw (po nazwie)
       setModels(list.sort((a, b) => a.id.localeCompare(b.id)));
     } catch {
-      setError(lang === 'it' ? 'Impossibile caricare i modelli.' : 'Nie udało się załadować modeli.');
+      setError(lang === 'it' ? 'Impossibile caricare i modelli.' : lang === 'en' ? 'Could not load models.' : 'Nie udało się załadować modeli.');
     } finally {
       setLoading(false);
     }
@@ -176,7 +193,7 @@ const ModelPicker: React.FC<{
                 type="text"
                 value={query}
                 onChange={e => setQuery(e.target.value)}
-                placeholder={lang === 'it' ? 'Cerca modello…' : 'Szukaj modelu…'}
+                placeholder={lang === 'it' ? 'Cerca modello…' : lang === 'en' ? 'Search model…' : 'Szukaj modelu…'}
                 className="w-full pl-8 pr-3 py-1.5 text-xs rounded-lg outline-none"
                 style={{ background: 'var(--c-bg)', border: '1px solid var(--c-border)', color: 'var(--c-text)' }}
               />
@@ -196,7 +213,7 @@ const ModelPicker: React.FC<{
             )}
             {!loading && !error && filtered.length === 0 && (
               <p className="text-xs text-center py-4" style={{ color: 'var(--c-faint)' }}>
-                {lang === 'it' ? 'Nessun risultato.' : 'Brak wyników.'}
+                {lang === 'it' ? 'Nessun risultato.' : lang === 'en' ? 'No results.' : 'Brak wyników.'}
               </p>
             )}
             {!loading && filtered.map(m => {
@@ -310,18 +327,19 @@ const ApiKeySetup: React.FC<{ onSave: (key: string) => void }> = ({ onSave }) =>
 
 const LessonCard: React.FC<{
   lesson: Lesson;
-  lang: 'it' | 'pl';
+  lang: 'it' | 'pl' | 'en';
   onOpen: () => void;
   onDelete: (e: React.MouseEvent) => void;
   isFav: boolean;
   onToggleFav: (e: React.MouseEvent) => void;
 }> = ({ lesson, lang, onOpen, onDelete, isFav, onToggleFav }) => {
+  const tl = lesson.targetLang ?? 'it';
   const gradient = DIFF_GRADIENT[lesson.difficulty_level] ?? DIFF_GRADIENT.B1;
   const diffLabels = DIFF_LABELS[lesson.difficulty_level];
-  const diffLabel = diffLabels ? diffLabels[lang] : lesson.difficulty_level;
-  const topicText = lang === 'pl' ? lesson.topic.pl : lesson.topic.it;
-  const subtitleText = lesson.subtitle ? (lang === 'pl' ? lesson.subtitle.pl : lesson.subtitle.it) : null;
-  const introText = lang === 'pl' ? lesson.introduction?.pl : lesson.introduction?.it;
+  const diffLabel = diffLabels ? diffLabels[lang === 'pl' ? 'pl' : tl] : lesson.difficulty_level;
+  const topicText = lang === 'pl' ? lesson.topic.pl : (tl === 'en' ? lesson.topic.en : lesson.topic.it) ?? lesson.topic.pl;
+  const subtitleText = lesson.subtitle ? (lang === 'pl' ? lesson.subtitle.pl : (tl === 'en' ? lesson.subtitle.en : lesson.subtitle.it) ?? lesson.subtitle.pl) : null;
+  const introText = lang === 'pl' ? lesson.introduction?.pl : (tl === 'en' ? lesson.introduction?.en : lesson.introduction?.it) ?? lesson.introduction?.pl;
 
   return (
     <article
@@ -385,7 +403,7 @@ const LessonCard: React.FC<{
         )}
         {lesson.vocabulary?.length > 0 && (
           <div>
-            <p className="micro-label mb-1">{lang === 'it' ? 'Parole chiave' : 'Kluczowe słowa'}</p>
+            <p className="micro-label mb-1">{lang === 'pl' ? 'Kluczowe słowa' : lang === 'en' ? 'Key words' : 'Parole chiave'}</p>
             <div className="flex flex-wrap gap-1">
               {lesson.vocabulary.slice(0, 3).map((v, i) => (
                 <span key={i} className="inline-flex items-center gap-1 text-xs rounded px-2 py-0.5 font-medium"
@@ -415,7 +433,7 @@ const LessonCard: React.FC<{
           )}
         </div>
         <span className="font-semibold group-hover:translate-x-1 transition-transform" style={{ color: 'var(--c-green)' }}>
-          {lang === 'it' ? 'Leggi →' : 'Czytaj →'}
+          {lang === 'pl' ? 'Czytaj →' : lang === 'en' ? 'Read →' : 'Leggi →'}
         </span>
       </div>
     </article>
@@ -433,7 +451,7 @@ const ChangeKeyModal: React.FC<{ onClose: () => void; onSave: (key: string) => v
     e.preventDefault();
     const trimmed = value.trim();
     if (!trimmed.startsWith('sk-or-')) {
-      setError(l === 'it' ? 'La chiave deve iniziare con "sk-or-".' : 'Klucz powinien zaczynać się od "sk-or-".');
+      setError(l === 'pl' ? 'Klucz powinien zaczynać się od "sk-or-".' : l === 'en' ? 'Key must start with "sk-or-".' : 'La chiave deve iniziare con "sk-or-".');
       return;
     }
     onSave(trimmed);
@@ -450,10 +468,10 @@ const ChangeKeyModal: React.FC<{ onClose: () => void; onSave: (key: string) => v
         </button>
         <div>
           <h2 className="font-serif font-bold text-base" style={{ color: 'var(--c-text)' }}>
-            {l === 'it' ? 'Cambia chiave API' : 'Zmień klucz API'}
+            {l === 'pl' ? 'Zmień klucz API' : l === 'en' ? 'Change API Key' : 'Cambia chiave API'}
           </h2>
           <p className="text-xs mt-0.5" style={{ color: 'var(--c-muted)' }}>
-            {l === 'it' ? 'Inserisci una nuova chiave OpenRouter.' : 'Podaj nowy klucz OpenRouter.'}
+            {l === 'pl' ? 'Podaj nowy klucz OpenRouter.' : l === 'en' ? 'Enter a new OpenRouter key.' : 'Inserisci una nuova chiave OpenRouter.'}
           </p>
         </div>
         <form onSubmit={handleSubmit} className="space-y-3">
@@ -473,7 +491,7 @@ const ChangeKeyModal: React.FC<{ onClose: () => void; onSave: (key: string) => v
             className="w-full py-2 rounded-lg font-semibold text-sm transition-colors disabled:opacity-40"
             style={{ background: 'var(--c-text)', color: '#fff' }}
           >
-            {l === 'it' ? 'Salva' : 'Zapisz'}
+            {l === 'pl' ? 'Zapisz' : l === 'en' ? 'Save' : 'Salva'}
           </button>
         </form>
       </div>
@@ -484,23 +502,32 @@ const ChangeKeyModal: React.FC<{ onClose: () => void; onSave: (key: string) => v
 // ─── Inner App ────────────────────────────────────────────────────────────────
 
 const DIFF_LEVELS = ['A1', 'A2', 'B1', 'B2', 'C1'] as const;
+const MAX_CONCURRENT = 10;
 
-const AppInner: React.FC<{ apiKey: string; onChangeKey: () => void }> = ({ apiKey, onChangeKey }) => {
-  const { globalLang, toggleGlobal } = useLang();
+const AppInner: React.FC<{ apiKey: string; onChangeKey: () => void; onBackToHome: () => void }> = ({ apiKey, onChangeKey, onBackToHome }) => {
+  const { globalLang, toggleGlobal, targetLang } = useLang();
   const { theme, toggleTheme } = useTheme();
+  const { fontSizeIndex, increaseFontSize, decreaseFontSize } = useFontSize();
 
   const [input, setInput] = useState('');
   const [history, setHistory] = useState<Lesson[]>([]);
   const [historyLoaded, setHistoryLoaded] = useState(false);
   const [activeLesson, setActiveLesson] = useState<Lesson | null>(null);
-  const [status, setStatus] = useState<'idle' | 'loading' | 'error'>('idle');
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [queue, setQueue] = useState<QueueItem[]>([]);
   const [search, setSearch] = useState('');
   const [activeModel, setActiveModel] = useState<string>(() => getSavedModel());
   const [diffFilter, setDiffFilter] = useState<string | null>(null);
   const [showFavsOnly, setShowFavsOnly] = useState(false);
   const [favSet, setFavSet] = useState<Set<string>>(() => getFavorites());
   const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // Refs so callbacks always see current values without re-binding
+  const apiKeyRef = useRef(apiKey);
+  const activeModelRef = useRef(activeModel);
+  const targetLangRef = useRef(targetLang);
+  useEffect(() => { apiKeyRef.current = apiKey; }, [apiKey]);
+  useEffect(() => { activeModelRef.current = activeModel; }, [activeModel]);
+  useEffect(() => { targetLangRef.current = targetLang; }, [targetLang]);
 
   // Wczytaj historię z pliku przy starcie
   useEffect(() => {
@@ -510,45 +537,121 @@ const AppInner: React.FC<{ apiKey: string; onChangeKey: () => void }> = ({ apiKe
     });
   }, []);
 
-  // Keyboard shortcuts on main page
+  // ── Queue runner ────────────────────────────────────────────────────────────
+  // Runs whenever queue changes: starts pending jobs up to MAX_CONCURRENT
+  const runQueue = useCallback((q: QueueItem[]) => {
+    const running = q.filter(j => j.status === 'running').length;
+    const pending = q.filter(j => j.status === 'pending');
+    const slots = MAX_CONCURRENT - running;
+    if (slots <= 0 || pending.length === 0) return;
+
+    const toStart = pending.slice(0, slots);
+
+    // Mark them as running immediately
+    setQueue(prev => prev.map(j =>
+      toStart.some(s => s.qid === j.qid)
+        ? { ...j, status: 'running', startedAt: Date.now() }
+        : j
+    ));
+
+    // Fire off each one
+    toStart.forEach(job => {
+      const genFn = targetLangRef.current === 'en' ? generateEnglishLesson : generateLesson;
+      genFn(job.topic, apiKeyRef.current, activeModelRef.current)
+        .then(async lesson => {
+          await saveLesson(lesson);
+          setHistory(prev => [lesson, ...prev]);
+          setQueue(prev => {
+            const next = prev.map(j =>
+              j.qid === job.qid ? { ...j, status: 'done' as QueueStatus, lessonId: lesson.id } : j
+            );
+            // trigger next pending after state settles
+            setTimeout(() => setQueue(q2 => { runQueue(q2); return q2; }), 0);
+            return next;
+          });
+        })
+        .catch(err => {
+          setQueue(prev => {
+            const next = prev.map(j =>
+              j.qid === job.qid
+                ? { ...j, status: 'error' as QueueStatus, error: err?.message ?? 'Błąd generowania' }
+                : j
+            );
+            setTimeout(() => setQueue(q2 => { runQueue(q2); return q2; }), 0);
+            return next;
+          });
+        });
+    });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Kick off runner when queue changes (only for pending/running items)
+  const prevQueueRef = useRef<QueueItem[]>([]);
+  useEffect(() => {
+    const hadPending = prevQueueRef.current.some(j => j.status === 'pending');
+    const hasPending = queue.some(j => j.status === 'pending');
+    const hasRunning = queue.some(j => j.status === 'running');
+    if (hasPending || (hasRunning && hadPending)) {
+      runQueue(queue);
+    }
+    prevQueueRef.current = queue;
+  }, [queue, runQueue]);
+
+  // ── Keyboard shortcuts ──────────────────────────────────────────────────────
   useEffect(() => {
     if (activeLesson) return;
     const h = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
       if (tag === 'input' || tag === 'textarea') return;
-      // '/' → focus search
-      if (e.key === '/') {
-        e.preventDefault();
-        searchInputRef.current?.focus();
-      }
-      // 'r' or 'R' → random lesson
-      if (e.key === 'r' || e.key === 'R') {
-        if (history.length > 0) {
-          const rand = history[Math.floor(Math.random() * history.length)];
-          setActiveLesson(rand);
-        }
+      if (e.key === '/') { e.preventDefault(); searchInputRef.current?.focus(); }
+      if ((e.key === 'r' || e.key === 'R') && history.length > 0) {
+        const rand = history[Math.floor(Math.random() * history.length)];
+        setActiveLesson(rand);
       }
     };
     window.addEventListener('keydown', h);
     return () => window.removeEventListener('keydown', h);
   }, [activeLesson, history]);
 
-  const handleSubmit = async (e: FormEvent) => {
+  // ── Enqueue topic ───────────────────────────────────────────────────────────
+  const enqueueTopics = () => {
+    const topics = input.split('\n').map(t => t.trim()).filter(Boolean);
+    if (topics.length === 0) return;
+    const newItems: QueueItem[] = topics.map(topic => ({
+      qid: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      topic,
+      status: 'pending',
+    }));
+    setQueue(prev => {
+      const next = [...prev, ...newItems];
+      setTimeout(() => setQueue(q2 => { runQueue(q2); return q2; }), 0);
+      return next;
+    });
+    setInput('');
+  };
+
+  const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
-    if (!input.trim()) return;
-    setStatus('loading');
-    setErrorMsg(null);
-    try {
-      const lesson = await generateLesson(input, apiKey, activeModel);
-      await saveLesson(lesson);
-      setHistory(prev => [lesson, ...prev]);
-      setActiveLesson(lesson);
-      setInput('');
-      setStatus('idle');
-    } catch {
-      setStatus('error');
-      setErrorMsg('Nie udało się wygenerować artykułu. Sprawdź klucz API i spróbuj ponownie.');
-    }
+    enqueueTopics();
+  };
+
+  const removeQueueItem = (qid: string) => {
+    setQueue(prev => prev.filter(j => j.qid !== qid || j.status === 'running'));
+  };
+
+  const retryQueueItem = (qid: string) => {
+    setQueue(prev => {
+      const next = prev.map(j =>
+        j.qid === qid && j.status === 'error'
+          ? { ...j, status: 'pending' as QueueStatus, error: undefined, startedAt: undefined }
+          : j
+      );
+      setTimeout(() => setQueue(q2 => { runQueue(q2); return q2; }), 0);
+      return next;
+    });
+  };
+
+  const clearFinished = () => {
+    setQueue(prev => prev.filter(j => j.status === 'pending' || j.status === 'running'));
   };
 
   const handleDelete = async (e: React.MouseEvent, id: string) => {
@@ -569,19 +672,22 @@ const AppInner: React.FC<{ apiKey: string; onChangeKey: () => void }> = ({ apiKe
     saveModel(modelId);
   };
 
-  const filteredHistory = history.filter(lesson => {
-    if (diffFilter && lesson.difficulty_level !== diffFilter) return false;
-    if (showFavsOnly && !favSet.has(lesson.id)) return false;
-    if (search.trim()) {
-      const q = search.toLowerCase();
-      return (
-        lesson.topic.pl.toLowerCase().includes(q) ||
-        lesson.topic.it.toLowerCase().includes(q) ||
-        lesson.tags?.some(t => t.toLowerCase().includes(q))
-      );
-    }
-    return true;
-  });
+  const filteredHistory = history
+    .filter(l => (l.targetLang ?? 'it') === targetLang)
+    .filter(lesson => {
+      if (diffFilter && lesson.difficulty_level !== diffFilter) return false;
+      if (showFavsOnly && !favSet.has(lesson.id)) return false;
+      if (search.trim()) {
+        const q = search.toLowerCase();
+        return (
+          lesson.topic.pl.toLowerCase().includes(q) ||
+          (lesson.topic.it ?? '').toLowerCase().includes(q) ||
+          (lesson.topic.en ?? '').toLowerCase().includes(q) ||
+          lesson.tags?.some(t => t.toLowerCase().includes(q))
+        );
+      }
+      return true;
+    });
 
   if (activeLesson) {
     return (
@@ -594,67 +700,100 @@ const AppInner: React.FC<{ apiKey: string; onChangeKey: () => void }> = ({ apiKe
   }
 
   const l = globalLang;
+  const isIt = targetLang === 'it';
+  const isEn = targetLang === 'en';
   const L = {
-    headline:     l === 'it' ? 'Di cosa vuoi leggere oggi?' : 'O czym chcesz dzisiaj poczytać?',
-    subtitle:     l === 'it' ? "Crea articoli, lezioni e approfondimenti culturali con l'AI." : 'Twórz artykuły, lekcje i opracowania kulturowe z AI.',
-    placeholder:  l === 'it' ? "Argomento (es. 'Rinascimento', 'Caffè', 'Opera')…" : "Temat (np. 'Renesans', 'Kawa', 'Opera')…",
-    generating:   l === 'it' ? 'Generazione in corso…' : 'Generowanie — to może chwilę zająć…',
-    yourArticles: l === 'it' ? 'I tuoi articoli' : 'Twoje artykuły',
-    search:       l === 'it' ? 'Cerca…' : 'Szukaj…',
-    noArticles:   l === 'it' ? 'Nessun articolo. Crea il tuo primo!' : 'Brak artykułów. Stwórz swój pierwszy!',
-    noArticlesSub:l === 'it' ? 'Es. "Pizza", "Roma" o "Venezia"' : 'Np. "Pizza", "Rzym" lub "Wenecja"',
-    noResults:    (q: string) => l === 'it' ? `Nessun risultato per "${q}"` : `Brak wyników dla "${q}"`,
-    langToggle:   l === 'it' ? 'Cambia lingua' : 'Zmień język',
-    apiKey:       l === 'it' ? 'Cambia chiave API' : 'Zmień klucz API',
+    appName:      l === 'pl' ? (isIt ? 'Włoski Mistrz AI' : 'Angielski Mistrz AI') : isEn ? 'English Master AI' : 'Maestro Italiano AI',
+    headline:     l === 'pl' ? 'O czym chcesz dzisiaj poczytać?' : isEn ? 'What do you want to read about today?' : 'Di cosa vuoi leggere oggi?',
+    subtitle:     l === 'pl' ? 'Twórz artykuły, lekcje i opracowania kulturowe z AI.' : isEn ? 'Create articles, lessons and cultural insights with AI.' : "Crea articoli, lezioni e approfondimenti culturali con l'AI.",
+    placeholder:  l === 'pl' ? 'Temat… (kilka linii = kilka artykułów równolegle)' : isEn ? 'Topic… (multiple lines = parallel articles)' : 'Argomento… (più righe = più articoli in parallelo)',
+    generating:   l === 'pl' ? 'Generowanie — to może chwilę zająć…' : isEn ? 'Generating — this may take a moment…' : 'Generazione in corso…',
+    yourArticles: l === 'pl' ? 'Twoje artykuły' : isEn ? 'Your articles' : 'I tuoi articoli',
+    search:       l === 'pl' ? 'Szukaj…' : isEn ? 'Search…' : 'Cerca…',
+    noArticles:   l === 'pl' ? 'Brak artykułów. Stwórz swój pierwszy!' : isEn ? 'No articles yet. Create your first!' : 'Nessun articolo. Crea il tuo primo!',
+    noArticlesSub:l === 'pl' ? (isIt ? 'Np. "Pizza", "Rzym" lub "Wenecja"' : 'Np. "greetings", "food" lub "British culture"') : isEn ? 'E.g. "Greetings", "Food" or "British culture"' : 'Es. "Pizza", "Roma" o "Venezia"',
+    noResults:    (q: string) => l === 'pl' ? `Brak wyników dla "${q}"` : isEn ? `No results for "${q}"` : `Nessun risultato per "${q}"`,
+    langToggle:   l === 'pl' ? 'Zmień język' : isEn ? 'Change language' : 'Cambia lingua',
+    apiKey:       l === 'pl' ? 'Zmień klucz API' : isEn ? 'Change API key' : 'Cambia chiave API',
+    backToHome:   l === 'pl' ? 'Zmień tryb' : isEn ? 'Change mode' : 'Cambia modalità',
   };
 
   return (
     <div className="min-h-screen font-sans" style={{ background: 'var(--c-bg)', color: 'var(--c-text)' }}>
       {/* Navbar */}
       <nav className="glass-nav sticky top-0 z-50">
-        <div className="max-w-screen-2xl mx-auto px-4 h-12 flex items-center justify-between">
-          <div className="flex items-center gap-2 cursor-pointer select-none" onClick={() => setActiveLesson(null)}>
-            <div className="flex gap-1">
-              <div className="w-2.5 h-2.5 rounded-full" style={{ background: 'var(--c-green)' }} />
-              <div className="w-2.5 h-2.5 rounded-full border" style={{ borderColor: 'var(--c-border)' }} />
-              <div className="w-2.5 h-2.5 rounded-full" style={{ background: 'var(--c-red)' }} />
+        <div className="max-w-screen-2xl mx-auto px-4 h-12 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={onBackToHome}
+              title={L.backToHome}
+              className="nav-icon-btn"
+            >
+              <ArrowLeftIcon className="w-4 h-4" />
+            </button>
+            <div className="flex items-center gap-2 cursor-pointer select-none" onClick={() => setActiveLesson(null)}>
+              <Flag code={targetLang} size={16} aria-hidden="true" />
+              <span className="font-serif font-bold text-lg tracking-tight hidden sm:inline" style={{ color: 'var(--c-text)' }}>
+                {L.appName}
+              </span>
             </div>
-            <span className="font-serif font-bold text-lg tracking-tight" style={{ color: 'var(--c-text)' }}>
-              {l === 'it' ? 'Maestro Italiano AI' : 'Włoski Mistrz AI'}
-            </span>
           </div>
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1 ml-auto">
             <ModelPicker
               apiKey={apiKey}
               activeModel={activeModel}
               onChange={handleModelChange}
               lang={l}
             />
+            {/* Rozmiar czcionki */}
+            <div className="flex items-center rounded-full border overflow-hidden" style={{ borderColor: 'var(--c-border)', background: 'var(--c-surface)' }}>
+              <button
+                onClick={decreaseFontSize}
+                disabled={fontSizeIndex === 0}
+                title="Mniejsza czcionka"
+                className="nav-icon-btn rounded-none border-0 disabled:opacity-30"
+                style={{ width: 30, height: 30, fontSize: 11 }}
+              >
+                A<sup style={{ fontSize: 7 }}>−</sup>
+              </button>
+              <div className="w-px h-4 shrink-0" style={{ background: 'var(--c-border)' }} />
+              <button
+                onClick={increaseFontSize}
+                disabled={fontSizeIndex === 4}
+                title="Większa czcionka"
+                className="nav-icon-btn rounded-none border-0 disabled:opacity-30"
+                style={{ width: 30, height: 30, fontSize: 13 }}
+              >
+                A<sup style={{ fontSize: 8 }}>+</sup>
+              </button>
+            </div>
+            {/* Język */}
             <button
               onClick={toggleGlobal}
               title={L.langToggle}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-full transition-all active:scale-95"
-              style={{ background: 'var(--c-text)', color: theme === 'dark' ? '#13151b' : '#fff' }}
+              className="nav-icon-btn font-bold text-xs"
+              style={{ background: 'var(--c-text)', color: theme === 'dark' ? '#13151b' : '#fff', width: 'auto', padding: '0 10px', gap: 4 }}
             >
-              <LanguageIcon className="w-3 h-3" />
-              {l === 'it' ? '🇮🇹 IT' : '🇵🇱 PL'}
+              <LanguageIcon className="w-3.5 h-3.5 shrink-0" />
+              <span>{l === 'pl' ? 'PL' : l === 'en' ? 'EN' : 'IT'}</span>
+              <LangFlag lang={l} size={14} />
             </button>
-            {/* Przełącznik motywu */}
+            {/* Motyw */}
             <button
               onClick={toggleTheme}
               title={theme === 'dark' ? 'Tryb jasny' : 'Tryb ciemny'}
-              className="theme-toggle"
+              className="nav-icon-btn"
             >
               {theme === 'dark'
                 ? <SunIcon className="w-4 h-4 theme-icon-enter" />
                 : <MoonIcon className="w-4 h-4 theme-icon-enter" />
               }
             </button>
+            {/* Klucz API */}
             <button
               onClick={onChangeKey}
               title={L.apiKey}
-              className="p-2 rounded-lg"
-              style={{ color: 'var(--c-faint)' }}
+              className="nav-icon-btn"
             >
               <KeyIcon className="w-3.5 h-3.5" />
             </button>
@@ -678,40 +817,140 @@ const AppInner: React.FC<{ apiKey: string; onChangeKey: () => void }> = ({ apiKe
 
             <form onSubmit={handleSubmit} className="relative max-w-lg mx-auto w-full group">
               <div className="absolute -inset-0.5 bg-gradient-to-r from-emerald-400 to-teal-500 rounded-xl blur opacity-15 group-hover:opacity-30 transition duration-500" />
-              <div className="relative flex items-center rounded-xl shadow-lg" style={{ background: 'var(--c-surface)' }}>
-                <input
-                  type="text"
+              <div className="relative rounded-xl shadow-lg" style={{ background: 'var(--c-surface)' }}>
+                <textarea
+                  rows={Math.min(Math.max(input.split('\n').length, 2), 8)}
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    // Enter → submit; Shift+Enter → nowa linia (domyślnie)
+                    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); enqueueTopics(); }
+                  }}
                   placeholder={L.placeholder}
-                  className="w-full px-4 py-3 rounded-xl bg-transparent border-0 focus:ring-0 text-sm placeholder:text-slate-400 outline-none"
-                  style={{ color: 'var(--c-text)' }}
-                  disabled={status === 'loading'}
+                  className="w-full px-4 py-3.5 pr-14 rounded-xl bg-transparent border-0 focus:ring-0 text-sm outline-none resize-none leading-relaxed"
+                  style={{ color: 'var(--c-text)', minHeight: 52 }}
                 />
                 <button
                   type="submit"
-                  disabled={status === 'loading' || !input.trim()}
-                  className="absolute right-1.5 p-2 rounded-lg transition-colors disabled:opacity-50"
+                  disabled={!input.trim()}
+                  className="absolute right-2 bottom-2 p-2 rounded-lg transition-all active:scale-95 disabled:opacity-40"
                   style={{ background: 'var(--c-text)', color: '#fff' }}
+                  title={l === 'pl' ? 'Dodaj do kolejki (Enter)' : l === 'en' ? 'Add to queue (Enter)' : 'Aggiungi alla coda (Enter)'}
                 >
-                  {status === 'loading'
-                    ? <SparklesIcon className="w-4 h-4 animate-spin" />
-                    : <PlusIcon className="w-4 h-4" />
-                  }
+                  <PlusIcon className="w-4 h-4" />
                 </button>
               </div>
+              <p className="mt-1.5 text-[10px] text-center" style={{ color: 'var(--c-faint)' }}>
+                {input.split('\n').filter(t => t.trim()).length > 1
+                  ? (l === 'pl'
+                    ? `${input.split('\n').filter(t => t.trim()).length} tematów — Enter by dodać wszystkie`
+                    : l === 'en'
+                    ? `${input.split('\n').filter(t => t.trim()).length} topics — Enter to add all`
+                    : `${input.split('\n').filter(t => t.trim()).length} argomenti — Enter per aggiungere tutti`)
+                  : (l === 'pl' ? 'Enter by dodać · Shift+Enter = nowa linia · kilka linii = równolegle'
+                    : l === 'en' ? 'Enter to add · Shift+Enter = new line · multiple lines = parallel'
+                    : 'Enter per aggiungere · Shift+Enter = nuova riga · più righe = parallelo')
+                }
+              </p>
             </form>
 
-            {status === 'loading' && (
-              <div className="flex items-center justify-center gap-2 text-xs animate-pulse" style={{ color: 'var(--c-muted)' }}>
-                <SparklesIcon className="w-3.5 h-3.5" style={{ color: 'var(--c-green)' }} />
-                {L.generating}
-              </div>
-            )}
-            {status === 'error' && (
-              <div className="inline-block text-xs font-medium px-3 py-2 rounded-lg animate-fade-in"
-                style={{ background: '#fef2f2', color: 'var(--c-red)', border: '1px solid #fecaca' }}>
-                {errorMsg}
+            {/* ── Queue panel ─────────────────────────────────────────── */}
+            {queue.length > 0 && (
+              <div className="max-w-lg mx-auto w-full space-y-1 animate-fade-in">
+                <div className="flex items-center justify-between px-1 mb-0.5">
+                  <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--c-faint)' }}>
+                    {l === 'pl' ? 'Kolejka generowania' : l === 'en' ? 'Generation queue' : 'Coda generazione'}
+                    {queue.filter(j => j.status === 'running').length > 0 && (
+                      <span className="ml-1 normal-case font-normal">
+                        — {queue.filter(j => j.status === 'running').length} {l === 'pl' ? 'w toku' : l === 'en' ? 'running' : 'in corso'}
+                        {queue.filter(j => j.status === 'pending').length > 0 && `, ${queue.filter(j => j.status === 'pending').length} ${l === 'pl' ? 'czeka' : l === 'en' ? 'waiting' : 'in attesa'}`}
+                      </span>
+                    )}
+                  </span>
+                  {queue.some(j => j.status === 'done' || j.status === 'error') && (
+                    <button onClick={clearFinished} className="text-[10px] underline" style={{ color: 'var(--c-faint)' }}>
+                      {l === 'pl' ? 'Wyczyść zakończone' : l === 'en' ? 'Clear finished' : 'Pulisci'}
+                    </button>
+                  )}
+                </div>
+                {queue.map(job => (
+                  <div key={job.qid}
+                    className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs animate-fade-in"
+                    style={{
+                      background: job.status === 'done'
+                        ? 'var(--c-green-dim)'
+                        : job.status === 'error'
+                          ? 'rgba(205,33,42,.08)'
+                          : 'var(--c-surface)',
+                      border: `1px solid ${
+                        job.status === 'done'
+                          ? 'rgba(0,140,69,.2)'
+                          : job.status === 'error'
+                            ? 'rgba(205,33,42,.2)'
+                            : 'var(--c-border)'
+                      }`,
+                    }}
+                  >
+                    {/* Status icon */}
+                    <span className="shrink-0">
+                      {job.status === 'running' && <SparklesIcon className="w-3.5 h-3.5 animate-spin" style={{ color: 'var(--c-green)' }} />}
+                      {job.status === 'pending' && <ClockIcon className="w-3.5 h-3.5" style={{ color: 'var(--c-faint)' }} />}
+                      {job.status === 'done'    && <CheckCircleIcon className="w-3.5 h-3.5" style={{ color: 'var(--c-green)' }} />}
+                      {job.status === 'error'   && <ExclamationCircleIcon className="w-3.5 h-3.5" style={{ color: 'var(--c-red)' }} />}
+                    </span>
+
+                    {/* Topic */}
+                    <span className="flex-1 font-medium truncate" style={{ color: 'var(--c-text)' }}>
+                      {job.topic}
+                    </span>
+                    {job.status === 'error' && job.error && (
+                      <span className="truncate max-w-[120px] text-[9px]" style={{ color: 'var(--c-red)' }} title={job.error}>
+                        {job.error.slice(0, 40)}{job.error.length > 40 ? '…' : ''}
+                      </span>
+                    )}
+
+                    {/* Status label / actions */}
+                    <span className="shrink-0 font-medium flex items-center gap-1" style={{
+                      color: job.status === 'done' ? 'var(--c-green)'
+                        : job.status === 'error' ? 'var(--c-red)'
+                        : job.status === 'running' ? 'var(--c-green)'
+                        : 'var(--c-faint)'
+                    }}>
+                      {job.status === 'running' && (l === 'pl' ? 'Generuję…' : l === 'en' ? 'Generating…' : 'Generando…')}
+                      {job.status === 'pending' && (l === 'pl' ? 'W kolejce' : l === 'en' ? 'Queued' : 'In attesa')}
+                      {job.status === 'done' && (
+                        <button
+                          onClick={() => {
+                            const lesson = history.find(h => h.id === job.lessonId);
+                            if (lesson) setActiveLesson(lesson);
+                          }}
+                          className="underline font-bold"
+                          style={{ color: 'var(--c-green)' }}
+                        >
+                          {l === 'pl' ? 'Otwórz →' : l === 'en' ? 'Open →' : 'Apri →'}
+                        </button>
+                      )}
+                      {job.status === 'error' && (
+                        <button
+                          onClick={() => retryQueueItem(job.qid)}
+                          className="flex items-center gap-0.5 font-bold underline"
+                          style={{ color: 'var(--c-red)' }}
+                          title={l === 'pl' ? 'Ponów próbę' : l === 'en' ? 'Retry' : 'Riprova'}
+                        >
+                          <ArrowPathIcon className="w-3 h-3" />
+                          {l === 'pl' ? 'Ponów' : l === 'en' ? 'Retry' : 'Riprova'}
+                        </button>
+                      )}
+                    </span>
+
+                    {/* Remove button (not running) */}
+                    {job.status !== 'running' && (
+                      <button onClick={() => removeQueueItem(job.qid)} className="shrink-0 p-0.5 rounded" style={{ color: 'var(--c-faint)' }}>
+                        <XMarkIcon className="w-3 h-3" />
+                      </button>
+                    )}
+                  </div>
+                ))}
               </div>
             )}
           </div>
@@ -727,22 +966,22 @@ const AppInner: React.FC<{ apiKey: string; onChangeKey: () => void }> = ({ apiKe
                   {L.yourArticles}
                 </h2>
                 <span className="text-xs" style={{ color: 'var(--c-faint)' }}>
-                  ({filteredHistory.length}{filteredHistory.length !== history.length ? `/${history.length}` : ''})
+                  ({filteredHistory.length}{filteredHistory.length !== history.filter(l => (l.targetLang ?? 'it') === targetLang).length ? `/${history.filter(l => (l.targetLang ?? 'it') === targetLang).length}` : ''})
                 </span>
                 {/* Random lesson button */}
-                {history.length > 1 && (
+                {filteredHistory.length > 1 && (
                   <button
-                    onClick={() => { const r = history[Math.floor(Math.random() * history.length)]; setActiveLesson(r); }}
+                    onClick={() => { const r = filteredHistory[Math.floor(Math.random() * filteredHistory.length)]; setActiveLesson(r); }}
                     className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold border transition-all"
                     style={{ background: 'var(--c-bg)', border: '1px solid var(--c-border)', color: 'var(--c-muted)' }}
-                    title={(l === 'it' ? 'Articolo casuale' : 'Losowa lekcja') + ' [R]'}
+                    title={(l === 'pl' ? 'Losowa lekcja' : l === 'en' ? 'Random article' : 'Articolo casuale') + ' [R]'}
                   >
                     <ArrowPathIcon className="w-3 h-3" />
-                    {l === 'it' ? 'Casuale' : 'Losowa'}
+                    {l === 'pl' ? 'Losowa' : l === 'en' ? 'Random' : 'Casuale'}
                   </button>
                 )}
                 {/* Favorites filter */}
-                {history.length > 0 && favSet.size > 0 && (
+                {filteredHistory.length > 0 && favSet.size > 0 && (
                   <button
                     onClick={() => setShowFavsOnly(v => !v)}
                     className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold border transition-all ${showFavsOnly ? 'active' : ''}`}
@@ -750,10 +989,10 @@ const AppInner: React.FC<{ apiKey: string; onChangeKey: () => void }> = ({ apiKe
                       ? { background: 'rgba(245,158,11,.12)', color: '#d97706', border: '1px solid rgba(245,158,11,.35)' }
                       : { background: 'var(--c-bg)', border: '1px solid var(--c-border)', color: 'var(--c-muted)' }
                     }
-                    title={l === 'it' ? 'Solo preferiti' : 'Tylko ulubione'}
+                    title={l === 'pl' ? 'Tylko ulubione' : l === 'en' ? 'Favourites only' : 'Solo preferiti'}
                   >
                     {showFavsOnly ? <StarIcon className="w-3 h-3" /> : <StarOutlineIcon className="w-3 h-3" />}
-                    {l === 'it' ? 'Preferiti' : 'Ulubione'}
+                    {l === 'pl' ? 'Ulubione' : l === 'en' ? 'Favourites' : 'Preferiti'}
                   </button>
                 )}
               </div>
@@ -782,9 +1021,9 @@ const AppInner: React.FC<{ apiKey: string; onChangeKey: () => void }> = ({ apiKe
                   onClick={() => setDiffFilter(null)}
                   className={`diff-pill ${diffFilter === null ? 'active' : ''}`}
                 >
-                  {l === 'it' ? 'Tutti' : 'Wszystkie'}
+                  {l === 'pl' ? 'Wszystkie' : l === 'en' ? 'All' : 'Tutti'}
                 </button>
-                {DIFF_LEVELS.filter(d => history.some(lesson => lesson.difficulty_level === d)).map(d => (
+                {DIFF_LEVELS.filter(d => filteredHistory.some(lesson => lesson.difficulty_level === d)).map(d => (
                   <button
                     key={d}
                     onClick={() => setDiffFilter(prev => prev === d ? null : d)}
@@ -792,7 +1031,7 @@ const AppInner: React.FC<{ apiKey: string; onChangeKey: () => void }> = ({ apiKe
                   >
                     {d}
                     <span className="ml-1 opacity-70 font-normal text-[9px]">
-                      {DIFF_LABELS[d]?.[l] ?? ''}
+                      {DIFF_LABELS[d]?.[l === 'pl' ? 'pl' : isEn ? 'en' : 'it'] ?? ''}
                     </span>
                   </button>
                 ))}
@@ -802,23 +1041,23 @@ const AppInner: React.FC<{ apiKey: string; onChangeKey: () => void }> = ({ apiKe
             {!historyLoaded ? (
               <div className="text-center py-12 text-xs animate-pulse" style={{ color: 'var(--c-faint)' }}>
                 <SparklesIcon className="w-4 h-4 mx-auto mb-2" style={{ color: 'var(--c-green)' }} />
-                {l === 'it' ? 'Caricamento biblioteca…' : 'Wczytywanie biblioteki…'}
+                {l === 'pl' ? 'Wczytywanie biblioteki…' : l === 'en' ? 'Loading library…' : 'Caricamento biblioteca…'}
               </div>
-            ) : history.length === 0 ? (
+            ) : history.filter(les => (les.targetLang ?? 'it') === targetLang).length === 0 ? (
               <div className="text-center py-16 rounded-2xl border-2 border-dashed space-y-1.5"
                 style={{ borderColor: 'var(--c-border)', color: 'var(--c-faint)' }}>
-                <p className="text-3xl">🇮🇹</p>
+                <Flag code={targetLang} size={40} aria-hidden="true" />
                 <p className="font-medium text-sm">{L.noArticles}</p>
                 <p className="text-xs">{L.noArticlesSub}</p>
               </div>
             ) : filteredHistory.length === 0 ? (
               <div className="text-center py-12 text-sm space-y-1" style={{ color: 'var(--c-faint)' }}>
-                {search.trim() ? L.noResults(search) : (l === 'it' ? 'Nessun articolo corrisponde ai filtri.' : 'Brak artykułów spełniających filtry.')}
+                {search.trim() ? L.noResults(search) : (l === 'pl' ? 'Brak artykułów spełniających filtry.' : l === 'en' ? 'No articles match the filters.' : 'Nessun articolo corrisponde ai filtri.')}
                 {(diffFilter || showFavsOnly) && (
                   <div>
                     <button onClick={() => { setDiffFilter(null); setShowFavsOnly(false); setSearch(''); }}
                       className="text-xs underline mt-1" style={{ color: 'var(--c-green)' }}>
-                      {l === 'it' ? 'Azzera filtri' : 'Wyczyść filtry'}
+                      {l === 'pl' ? 'Wyczyść filtry' : l === 'en' ? 'Clear filters' : 'Azzera filtri'}
                     </button>
                   </div>
                 )}
@@ -846,17 +1085,72 @@ const AppInner: React.FC<{ apiKey: string; onChangeKey: () => void }> = ({ apiKe
         style={{ color: 'var(--c-faint)', borderColor: 'var(--c-border)', background: 'var(--c-surface-2)' }}>
         <div className="max-w-screen-2xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
           <span className="text-xs">
-            {l === 'it' ? 'Maestro Italiano AI' : 'Włoski Mistrz AI'} &copy; 2025 · Powered by OpenRouter
+            {L.appName} &copy; 2025 · Powered by OpenRouter
           </span>
-          {history.length > 0 && (
+          {filteredHistory.length > 0 && (
             <div className="flex items-center gap-2 text-[10px]">
-              <span style={{ color: 'var(--c-faint)' }}>{l === 'it' ? 'Scorciatoie:' : 'Skróty:'}</span>
-              <span className="kbd">/</span><span>{l === 'it' ? 'cerca' : 'szukaj'}</span>
-              <span className="kbd">R</span><span>{l === 'it' ? 'casuale' : 'losowa'}</span>
+              <span style={{ color: 'var(--c-faint)' }}>{l === 'pl' ? 'Skróty:' : l === 'en' ? 'Shortcuts:' : 'Scorciatoie:'}</span>
+              <span className="kbd">/</span><span>{l === 'pl' ? 'szukaj' : l === 'en' ? 'search' : 'cerca'}</span>
+              <span className="kbd">R</span><span>{l === 'pl' ? 'losowa' : l === 'en' ? 'random' : 'casuale'}</span>
             </div>
           )}
         </div>
       </footer>
+    </div>
+  );
+};
+
+// ─── Home Screen ──────────────────────────────────────────────────────────────
+
+const HomeScreen: React.FC<{ onSelect: (lang: TargetLang) => void }> = ({ onSelect }) => {
+  return (
+    <div className="min-h-screen flex flex-col items-center justify-center px-4 gap-10"
+      style={{ background: 'var(--c-bg)', color: 'var(--c-text)' }}>
+      <div className="text-center space-y-3">
+        <div className="flex gap-1.5 justify-center mb-2">
+          <div className="w-3 h-3 rounded-full" style={{ background: 'var(--c-green)' }} />
+          <div className="w-3 h-3 rounded-full border" style={{ borderColor: 'var(--c-border)' }} />
+          <div className="w-3 h-3 rounded-full" style={{ background: 'var(--c-red)' }} />
+        </div>
+        <h1 className="text-4xl md:text-5xl font-serif font-bold tracking-tight">
+          <span className="hero-gradient">Mistrz AI</span>
+        </h1>
+        <p className="text-sm" style={{ color: 'var(--c-muted)' }}>
+          Wybierz język, którego chcesz się uczyć
+        </p>
+      </div>
+
+      <div className="flex flex-col sm:flex-row gap-5 w-full max-w-md">
+        {/* Włoski */}
+        <button
+          onClick={() => onSelect('it')}
+          className="flex-1 group card card-hover p-8 flex flex-col items-center gap-4 transition-all"
+        >
+          <Flag code="it" size={56} />
+          <div className="text-center">
+            <p className="font-serif font-bold text-xl" style={{ color: 'var(--c-text)' }}>Włoski</p>
+            <p className="text-xs mt-1" style={{ color: 'var(--c-muted)' }}>Polsko-włoski</p>
+          </div>
+          <span className="text-xs font-semibold group-hover:translate-x-1 transition-transform" style={{ color: 'var(--c-green)' }}>
+            Wybierz →
+          </span>
+        </button>
+
+        {/* Angielski */}
+        <button
+          onClick={() => onSelect('en')}
+          className="flex-1 group card card-hover p-8 flex flex-col items-center gap-4 transition-all"
+        >
+          <Flag code="en" size={56} />
+          <div className="text-center">
+            <p className="font-serif font-bold text-xl" style={{ color: 'var(--c-text)' }}>Angielski</p>
+            <p className="text-xs mt-1" style={{ color: 'var(--c-muted)' }}>Polsko-angielski</p>
+          </div>
+          <span className="text-xs font-semibold group-hover:translate-x-1 transition-transform" style={{ color: 'var(--c-green)' }}>
+            Wybierz →
+          </span>
+        </button>
+      </div>
     </div>
   );
 };
@@ -866,20 +1160,42 @@ const AppInner: React.FC<{ apiKey: string; onChangeKey: () => void }> = ({ apiKe
 const App: React.FC = () => {
   const [apiKey, setApiKey] = useState<string>(() => localStorage.getItem(API_KEY_STORAGE) || '');
   const [showKeyModal, setShowKeyModal] = useState(false);
+  const [targetLang, setTargetLang] = useState<TargetLang | null>(() => {
+    const saved = localStorage.getItem(APP_MODE_KEY) as TargetLang | null;
+    return saved === 'it' || saved === 'en' ? saved : null;
+  });
 
   const saveApiKey = (key: string) => {
     localStorage.setItem(API_KEY_STORAGE, key);
     setApiKey(key);
   };
 
+  const selectLang = (lang: TargetLang) => {
+    localStorage.setItem(APP_MODE_KEY, lang);
+    setTargetLang(lang);
+  };
+
+  const goHome = () => {
+    setTargetLang(null);
+    localStorage.removeItem(APP_MODE_KEY);
+  };
+
   if (!apiKey) return <ApiKeySetup onSave={saveApiKey} />;
 
+  if (!targetLang) {
+    return (
+      <LangProvider targetLang="it">
+        <HomeScreen onSelect={selectLang} />
+      </LangProvider>
+    );
+  }
+
   return (
-    <LangProvider>
+    <LangProvider targetLang={targetLang}>
       {showKeyModal && (
         <ChangeKeyModal onClose={() => setShowKeyModal(false)} onSave={saveApiKey} />
       )}
-      <AppInner apiKey={apiKey} onChangeKey={() => setShowKeyModal(true)} />
+      <AppInner apiKey={apiKey} onChangeKey={() => setShowKeyModal(true)} onBackToHome={goHome} />
     </LangProvider>
   );
 };

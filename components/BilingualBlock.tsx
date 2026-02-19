@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, ElementType } from 'react';
 import { Bilingual } from '../types';
 import { useLang, Lang } from '../context/LangContext';
 
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface BilingualBlockProps<T extends ElementType = 'span'> {
@@ -14,10 +15,6 @@ interface BilingualBlockProps<T extends ElementType = 'span'> {
   onSwitch?: (newLang: Lang) => void;
 }
 
-// ─── Flag indicators ──────────────────────────────────────────────────────────
-
-const FLAG: Record<Lang, string> = { it: '🇮🇹', pl: '🇵🇱' };
-
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export function BilingualBlock<T extends ElementType = 'span'>({
@@ -27,7 +24,7 @@ export function BilingualBlock<T extends ElementType = 'span'>({
   noClick = false,
   onSwitch,
 }: BilingualBlockProps<T>) {
-  const { globalLang, syncKey } = useLang();
+  const { globalLang, syncKey, targetLang } = useLang();
   const [localLang, setLocalLang] = useState<Lang>(globalLang);
   const [flash, setFlash] = useState(false);
   const prevSyncKey = useRef(syncKey);
@@ -42,7 +39,6 @@ export function BilingualBlock<T extends ElementType = 'span'>({
         setLocalLang(globalLang);
       }
     }
-    // Also keep in sync on mount.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [syncKey, globalLang]);
 
@@ -58,18 +54,19 @@ export function BilingualBlock<T extends ElementType = 'span'>({
   const handleClick = (e: React.MouseEvent) => {
     if (noClick) return;
     e.stopPropagation();
-    triggerSwitch(localLang === 'it' ? 'pl' : 'it');
+    triggerSwitch(localLang === 'pl' ? targetLang : 'pl');
   };
 
-  const isDesynced = localLang !== globalLang;
-  const text = localLang === 'it' ? content.it : content.pl;
+  const text = localLang === 'pl'
+    ? content.pl
+    : (targetLang === 'en' ? content.en : content.it) ?? content.pl;
   const Tag = (as ?? 'span') as ElementType;
 
   const tooltip = noClick
     ? undefined
-    : localLang === 'it'
-      ? '🇵🇱 Kliknij → Polski'
-      : '🇮🇹 Clicca → Italiano';
+    : localLang !== 'pl'
+      ? 'Kliknij → Polski'
+      : targetLang === 'en' ? 'Click → English' : 'Clicca → Italiano';
 
   return (
     <Tag
@@ -85,14 +82,6 @@ export function BilingualBlock<T extends ElementType = 'span'>({
       style={flash ? { opacity: 0.15 } : { opacity: 1 }}
     >
       {text}
-      {isDesynced && !noClick && (
-        <span
-          className="bb-badge"
-          title={`Niezsynch. (${FLAG[localLang]}) — kliknij by zsynchronizować`}
-        >
-          {FLAG[localLang]}
-        </span>
-      )}
     </Tag>
   );
 }

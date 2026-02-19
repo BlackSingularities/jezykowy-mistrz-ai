@@ -29,8 +29,9 @@ import {
 import { CheckCircleIcon, StarIcon as StarSolidIcon } from '@heroicons/react/24/solid';
 
 import { Lesson, VocabularyItem, MistakeCategory, Register, DialogueTone, PartOfSpeech } from '../types';
-import { useLang, useTheme } from '../context/LangContext';
+import { useLang, useTheme, useFontSize } from '../context/LangContext';
 import { B } from './BilingualBlock';
+import { Flag, LangFlag } from './Flag';
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
@@ -108,13 +109,13 @@ const GENDER_LABEL: Record<string, { pl: string; it: string }> = {
   invariant:{ pl: 'niezm.',it: 'inv.' },
 };
 
-const REGISTER_STYLE: Record<Register, string> = {
-  formal:    'bg-indigo-50 text-indigo-600 border-indigo-100',
-  informal:  'bg-amber-50 text-amber-600 border-amber-100',
-  colloquial:'bg-orange-50 text-orange-600 border-orange-100',
-  literary:  'bg-rose-50 text-rose-600 border-rose-100',
-  regional:  'bg-teal-50 text-teal-600 border-teal-100',
-  vulgar:    'bg-red-50 text-red-600 border-red-100',
+const REGISTER_STYLE: Record<Register, React.CSSProperties> = {
+  formal:    { background: 'rgba(99,102,241,.15)',  color: '#818cf8', borderColor: 'rgba(99,102,241,.3)' },
+  informal:  { background: 'rgba(245,158,11,.15)',  color: '#fbbf24', borderColor: 'rgba(245,158,11,.3)' },
+  colloquial:{ background: 'rgba(249,115,22,.15)',  color: '#fb923c', borderColor: 'rgba(249,115,22,.3)' },
+  literary:  { background: 'rgba(244,63,94,.15)',   color: '#fb7185', borderColor: 'rgba(244,63,94,.3)'  },
+  regional:  { background: 'rgba(20,184,166,.15)',  color: '#2dd4bf', borderColor: 'rgba(20,184,166,.3)' },
+  vulgar:    { background: 'rgba(239,68,68,.15)',   color: '#f87171', borderColor: 'rgba(239,68,68,.3)'  },
 };
 
 const TONE_EMOJI: Record<DialogueTone, string> = {
@@ -143,26 +144,35 @@ function splitText(text: string): string[] {
   return chunks.length ? chunks : [raw];
 }
 
-const useTTS = () => {
+const useTTS = (targetLang: 'it' | 'en' = 'it') => {
   const [rate, setRate] = useState(0.9);
   const [speakId, setSpeakId] = useState<string | null>(null);
   const voiceRef = React.useRef<SpeechSynthesisVoice | null>(null);
   const [hasItalianVoice, setHasItalianVoice] = useState(false);
+  const ttsLang = targetLang === 'en' ? 'en-GB' : 'it-IT';
 
   useEffect(() => {
     const findVoice = () => {
       const voices = window.speechSynthesis?.getVoices() ?? [];
-      voiceRef.current =
-        voices.find(v => v.lang === 'it-IT' && v.localService) ||
-        voices.find(v => v.lang === 'it-IT') ||
-        voices.find(v => v.lang.startsWith('it')) ||
-        null;
+      if (targetLang === 'en') {
+        voiceRef.current =
+          voices.find(v => v.lang === 'en-GB' && v.localService) ||
+          voices.find(v => v.lang === 'en-GB') ||
+          voices.find(v => v.lang.startsWith('en')) ||
+          null;
+      } else {
+        voiceRef.current =
+          voices.find(v => v.lang === 'it-IT' && v.localService) ||
+          voices.find(v => v.lang === 'it-IT') ||
+          voices.find(v => v.lang.startsWith('it')) ||
+          null;
+      }
       setHasItalianVoice(!!voiceRef.current);
     };
     findVoice();
     window.speechSynthesis?.addEventListener('voiceschanged', findVoice);
     return () => window.speechSynthesis?.removeEventListener('voiceschanged', findVoice);
-  }, []);
+  }, [targetLang]);
 
   const speak = useCallback((italianText: string, id: string) => {
     if (!('speechSynthesis' in window)) return;
@@ -173,7 +183,7 @@ const useTTS = () => {
     const next = () => {
       if (i >= chunks.length) { setSpeakId(null); return; }
       const u = new SpeechSynthesisUtterance(chunks[i++]);
-      u.lang = 'it-IT';
+      u.lang = ttsLang;
       u.rate = rate;
       if (voiceRef.current) u.voice = voiceRef.current;
       u.onend = next;
@@ -264,7 +274,9 @@ const FlashcardQuiz: React.FC<{
   lesson: import('../types').Lesson;
   onClose: () => void;
 }> = ({ lesson, onClose }) => {
-  const { globalLang: l } = useLang();
+  const { globalLang: l, targetLang } = useLang();
+  const isEnQ = targetLang === 'en';
+  const t3q = (pl: string, it: string, en: string) => l === 'pl' ? pl : isEnQ ? en : it;
   const items = lesson.vocabulary;
   const [state, setState] = useState<QuizState>({
     index: 0,
@@ -318,19 +330,19 @@ const FlashcardQuiz: React.FC<{
   }, [state.step, state.index]);
 
   const LL = {
-    title:      l === 'it' ? 'Ripasso Vocabolario' : 'Powtórka słownictwa',
-    question:   l === 'it' ? 'Come si traduce?' : 'Jak to przetłumaczyć?',
-    reveal:     l === 'it' ? 'Mostra risposta' : 'Pokaż odpowiedź',
-    knew:       l === 'it' ? 'Sapevo ✓' : 'Wiedziałem ✓',
-    didntKnow:  l === 'it' ? 'Non sapevo ✗' : 'Nie wiedziałem ✗',
-    results:    l === 'it' ? 'Risultati' : 'Wyniki',
-    score:      (c: number, t: number) => l === 'it' ? `${c} / ${t} corrette` : `${c} / ${t} poprawnych`,
-    great:      l === 'it' ? 'Ottimo lavoro! 🎉' : 'Świetna robota! 🎉',
-    again:      l === 'it' ? 'Riprova' : 'Spróbuj jeszcze raz',
-    close:      l === 'it' ? 'Chiudi' : 'Zamknij',
-    hint:       l === 'it' ? 'Spazio = mostra · ← sbagliato · → corretto' : 'Spacja = pokaż · ← nie wiedziałem · → wiedziałem',
-    word:       l === 'it' ? 'Parola italiana' : 'Słowo włoskie',
-    meaning:    l === 'it' ? 'Significato' : 'Znaczenie',
+    title:      t3q('Powtórka słownictwa',         'Ripasso Vocabolario', 'Vocabulary review'),
+    question:   t3q('Jak to przetłumaczyć?',        'Come si traduce?',    'How do you translate this?'),
+    reveal:     t3q('Pokaż odpowiedź',              'Mostra risposta',     'Show answer'),
+    knew:       t3q('Wiedziałem ✓',                 'Sapevo ✓',            'Knew it ✓'),
+    didntKnow:  t3q('Nie wiedziałem ✗',             'Non sapevo ✗',        "Didn't know ✗"),
+    results:    t3q('Wyniki',                       'Risultati',           'Results'),
+    score:      (c: number, tot: number) => t3q(`${c} / ${tot} poprawnych`, `${c} / ${tot} corrette`, `${c} / ${tot} correct`),
+    great:      t3q('Świetna robota! 🎉',           'Ottimo lavoro! 🎉',   'Great job! 🎉'),
+    again:      t3q('Spróbuj jeszcze raz',          'Riprova',             'Try again'),
+    close:      t3q('Zamknij',                      'Chiudi',              'Close'),
+    hint:       t3q('Spacja = pokaż · ← nie wiem · → wiem', 'Spazio = mostra · ← sbagliato · → corretto', 'Space = show · ← wrong · → correct'),
+    word:       t3q('Słowo',                        'Parola italiana',     'Word'),
+    meaning:    t3q('Znaczenie',                    'Significato',         'Meaning'),
   };
 
   const scorePercent = state.index > 0 ? Math.round((state.correct / state.index) * 100) : 0;
@@ -426,9 +438,9 @@ const FlashcardQuiz: React.FC<{
                   <div className="p-3 rounded-xl text-sm" style={{ background: 'var(--c-bg)', border: '1px solid var(--c-border)' }}>
                     <p className="micro-label mb-1" style={{ color: 'var(--c-faint)' }}>{LL.meaning}</p>
                     <p className="font-semibold" style={{ color: 'var(--c-text)' }}>{current.translation}</p>
-                    {(l === 'it' ? current.definition.it : current.definition.pl) && (
+                    {(l === 'pl' ? current.definition.pl : (isEnQ ? current.definition.en : current.definition.it) ?? current.definition.pl) && (
                       <p className="text-xs mt-0.5 italic leading-relaxed" style={{ color: 'var(--c-muted)' }}>
-                        {l === 'it' ? current.definition.it : current.definition.pl}
+                        {l === 'pl' ? current.definition.pl : (isEnQ ? current.definition.en : current.definition.it) ?? current.definition.pl}
                       </p>
                     )}
                   </div>
@@ -510,24 +522,40 @@ const SpeakBtn: React.FC<{
   label?: string;
   className?: string;
 }> = ({ italianText, id, speak, stop, speakId, label, className = '' }) => {
-  const { globalLang } = useLang();
+  const { globalLang, targetLang } = useLang();
   const active = speakId === id;
-  const stopLbl  = globalLang === 'it' ? 'Ferma' : 'Zatrzymaj';
-  const listenLbl = globalLang === 'it' ? 'Ascolta 🇮🇹' : 'Odsłuchaj 🇮🇹';
+  const stopLbl  = globalLang === 'pl' ? 'Zatrzymaj' : globalLang === 'en' ? 'Stop' : 'Ferma';
+  const listenLbl = globalLang === 'pl' ? 'Odsłuchaj' : globalLang === 'en' ? 'Listen' : 'Ascolta';
+  const listenTitle = globalLang === 'pl'
+    ? (targetLang === 'en' ? 'Odsłuchaj po angielsku' : 'Odsłuchaj po włosku')
+    : globalLang === 'en' ? 'Listen in English' : 'Ascolta in italiano';
   return (
     <button
       onClick={() => active ? stop() : speak(italianText, id)}
       className={`speak-btn ${active ? 'active' : ''} ${className}`}
-      title={active ? stopLbl : (globalLang === 'it' ? 'Ascolta in italiano' : 'Odsłuchaj po włosku')}
+      title={active ? stopLbl : listenTitle}
     >
       {active
         ? <StopCircleIcon className="w-3.5 h-3.5 animate-pulse" />
         : <SpeakerWaveIcon className="w-3.5 h-3.5" />
       }
-      {label !== undefined ? label : (active ? stopLbl : listenLbl)}
+      {label !== undefined ? label : (active ? stopLbl : <><Flag code={targetLang} size={13} aria-hidden="true" />{' '}{listenLbl}</>)}
     </button>
   );
 };
+
+// ─── VocabCardSkeleton ────────────────────────────────────────────────────────
+
+const VocabCardSkeleton: React.FC<{ index: number }> = ({ index }) => (
+  <div className="card overflow-hidden opacity-40" style={{ minHeight: 120 }}>
+    <div className="p-4 flex flex-col gap-2 justify-center items-center h-full" style={{ minHeight: 120 }}>
+      <div className="rounded-md animate-pulse" style={{ width: '60%', height: 14, background: 'var(--c-border)' }} />
+      <div className="rounded-md animate-pulse" style={{ width: '40%', height: 10, background: 'var(--c-border-soft)' }} />
+      <div className="rounded-md animate-pulse mt-1" style={{ width: '80%', height: 10, background: 'var(--c-border-soft)' }} />
+      <span className="text-xs mt-1" style={{ color: 'var(--c-muted)', opacity: 0.6 }}>#{index + 1}</span>
+    </div>
+  </div>
+);
 
 // ─── VocabCard ────────────────────────────────────────────────────────────────
 
@@ -539,19 +567,21 @@ const VocabCard: React.FC<{
   cardId: string;
 }> = ({ item, speak, stop, speakId, cardId }) => {
   const [open, setOpen] = useState(false);
-  const { globalLang: l } = useLang();
+  const { globalLang: l, targetLang } = useLang();
+  const isEn = targetLang === 'en';
+  const t3v = (pl: string, it: string, en: string) => l === 'pl' ? pl : isEn ? en : it;
 
-  const posLabel    = POS_LABEL[item.part_of_speech]?.[l] ?? item.part_of_speech;
-  const genderLabel = item.gender ? (GENDER_LABEL[item.gender]?.[l] ?? item.gender) : null;
+  const posLabel    = POS_LABEL[item.part_of_speech]?.[l === 'pl' ? 'pl' : 'it'] ?? item.part_of_speech;
+  const genderLabel = item.gender ? (GENDER_LABEL[item.gender]?.[l === 'pl' ? 'pl' : 'it'] ?? item.gender) : null;
   const gs          = item.gender ? GENDER_STYLE[item.gender] : null;
 
   const LL = {
-    etymology:  l === 'it' ? 'Etimologia'          : 'Etymologia',
-    synonyms:   l === 'it' ? 'Sinonimi'            : 'Synonimy',
-    antonyms:   l === 'it' ? 'Contrari'            : 'Antonimy',
-    wordFamily: l === 'it' ? 'Famiglia di parole'  : 'Rodzina wyrazów',
-    listenSent: l === 'it' ? 'Ascolta la frase'    : 'Odsłuchaj zdanie',
-    pluralLbl:  l === 'it' ? 'pl.'                 : 'l.mn.:',
+    etymology:  t3v('Etymologia',      'Etimologia',         'Etymology'),
+    synonyms:   t3v('Synonimy',        'Sinonimi',           'Synonyms'),
+    antonyms:   t3v('Antonimy',        'Contrari',           'Antonyms'),
+    wordFamily: t3v('Rodzina wyrazów', 'Famiglia di parole', 'Word family'),
+    listenSent: t3v('Odsłuchaj zdanie','Ascolta la frase',   'Listen to sentence'),
+    pluralLbl:  t3v('l.mn.:',          'pl.',                'pl.:'),
   };
 
   return (
@@ -569,8 +599,8 @@ const VocabCard: React.FC<{
                 </Badge>
               )}
               {item.register && (
-                <Badge className={REGISTER_STYLE[item.register]}>
-                  {REG_LABEL[item.register]?.[l] ?? item.register}
+                <Badge style={{ border: '1px solid', ...REGISTER_STYLE[item.register] }}>
+                  {REG_LABEL[item.register]?.[l === 'pl' ? 'pl' : 'it'] ?? item.register}
                 </Badge>
               )}
               <Badge style={{ background: 'var(--c-bg)', color: 'var(--c-faint)', borderColor: 'var(--c-border)' }}>
@@ -614,14 +644,14 @@ const VocabCard: React.FC<{
           </div>
         </div>
 
-        <p className="text-sm leading-relaxed" style={{ color: 'var(--c-muted)' }}>
+        <p className="text-sm leading-relaxed text-justify-block" style={{ color: 'var(--c-muted)' }}>
           <B content={item.definition} />
         </p>
 
         <div className="mt-2 p-3 rounded-lg" style={{ background: 'var(--c-bg)'}}>
           <p className="text-xs italic" style={{ color: 'var(--c-text)' }}>"<B content={item.context_sentence} />"</p>
           <SpeakBtn
-            italianText={item.context_sentence.it}
+            italianText={(isEn ? item.context_sentence.en : item.context_sentence.it) ?? item.context_sentence.pl ?? ''}
             id={cardId + '-sentence'}
             speak={speak} stop={stop} speakId={speakId}
             label={LL.listenSent}
@@ -694,9 +724,14 @@ const VocabCard: React.FC<{
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export const LessonView: React.FC<LessonViewProps> = ({ lesson, onBack, onChangeKey }) => {
-  const { globalLang: l, toggleGlobal } = useLang();
+  const { globalLang: l, toggleGlobal, targetLang } = useLang();
+  const isEn = targetLang === 'en';
+  // Helper: pick target-language text from a bilingual field
+  const tl = (b?: { it?: string; en?: string; pl?: string }): string =>
+    b ? ((isEn ? b.en : b.it) ?? b.pl ?? '') : '';
   const { theme, toggleTheme } = useTheme();
-  const { rate, setRate, speak, stop, speakId, hasItalianVoice } = useTTS();
+  const { fontSizeIndex, increaseFontSize, decreaseFontSize } = useFontSize();
+  const { rate, setRate, speak, stop, speakId, hasItalianVoice } = useTTS(targetLang);
   const activeSection = useScrollSpy();
   const readingProgress = useReadingProgress();
 
@@ -722,50 +757,54 @@ export const LessonView: React.FC<LessonViewProps> = ({ lesson, onBack, onChange
 
   const scrollTo = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
 
+  // t3 helper: pick based on display lang (pl vs target)
+  const t3 = (pl: string, it: string, en: string) =>
+    l === 'pl' ? pl : isEn ? en : it;
+
   const L = {
-    library:      l === 'it' ? 'Biblioteca'             : 'Biblioteka',
-    toc:          l === 'it' ? 'Sommario'               : 'Spis treści',
-    trivia:       l === 'it' ? 'Curiosità'              : 'Ciekawostka',
-    readMins:     (n: number) => l === 'it' ? `${n} min lettura` : `${n} min czytania`,
-    keyTakeaways: l === 'it' ? 'Cosa imparerai'         : 'Co wyniesiesz z tej lekcji',
-    examples:     l === 'it' ? 'Esempi'                 : 'Przykłady',
-    exceptions:   l === 'it' ? 'Eccezioni'              : 'Wyjątki',
-    mnemonic:     l === 'it' ? 'Aiuto mnemonico'        : 'Wskazówka mnemotechniczna',
-    wrong:        l === 'it' ? 'Sbagliato'              : 'Źle',
-    correct:      l === 'it' ? 'Corretto'               : 'Dobrze',
-    listenIntro:  l === 'it' ? 'Ascolta introduzione'   : 'Odsłuchaj wstęp',
-    listenStory:  l === 'it' ? 'Ascolta il racconto'    : 'Odsłuchaj opowiadanie',
-    listenCulture:l === 'it' ? 'Ascolta testo'          : 'Odsłuchaj tekst',
-    playDialogue: l === 'it' ? 'Riproduci dialogo'      : 'Odtwórz cały dialog',
-    translation:  l === 'it' ? 'Traduzione'             : 'Tłumaczenie',
-    meaning:      l === 'it' ? 'Significato'            : 'Znaczenie',
-    origin:       l === 'it' ? 'Origine'                : 'Pochodzenie',
-    literally:    l === 'it' ? 'Letteralmente'          : 'Dosłownie',
-    exampleLbl:   l === 'it' ? 'Esempio'                : 'Przykład',
-    didYouKnow:   l === 'it' ? 'Lo sapevi che…'         : 'Czy wiesz, że…',
-    regional:     l === 'it' ? 'Varianti regionali'     : 'Różnice regionalne',
-    apiKey:       l === 'it' ? 'Cambia chiave API'      : 'Zmień klucz API',
-    voiceFound:   l === 'it' ? 'Voce italiana trovata'  : 'Głos włoski znaleziony',
-    voiceMissing: l === 'it' ? 'Nessuna voce italiana'  : 'Brak głosu włoskiego',
+    library:      t3('Biblioteka',                    'Biblioteca',             'Library'),
+    toc:          t3('Spis treści',                   'Sommario',               'Contents'),
+    trivia:       t3('Ciekawostka',                   'Curiosità',              'Did you know'),
+    readMins:     (n: number) => t3(`${n} min czytania`, `${n} min lettura`,    `${n} min read`),
+    keyTakeaways: t3('Co wyniesiesz z tej lekcji',    'Cosa imparerai',         'Key takeaways'),
+    examples:     t3('Przykłady',                     'Esempi',                 'Examples'),
+    exceptions:   t3('Wyjątki',                       'Eccezioni',              'Exceptions'),
+    mnemonic:     t3('Wskazówka mnemotechniczna',     'Aiuto mnemonico',        'Memory tip'),
+    wrong:        t3('Źle',                           'Sbagliato',              'Wrong'),
+    correct:      t3('Dobrze',                        'Corretto',               'Correct'),
+    listenIntro:  t3('Odsłuchaj wstęp',               'Ascolta introduzione',   'Listen to intro'),
+    listenStory:  t3('Odsłuchaj opowiadanie',         'Ascolta il racconto',    'Listen to story'),
+    listenCulture:t3('Odsłuchaj tekst',               'Ascolta testo',          'Listen to text'),
+    playDialogue: t3('Odtwórz cały dialog',           'Riproduci dialogo',      'Play full dialogue'),
+    translation:  t3('Tłumaczenie',                   'Traduzione',             'Translation'),
+    meaning:      t3('Znaczenie',                     'Significato',            'Meaning'),
+    origin:       t3('Pochodzenie',                   'Origine',                'Origin'),
+    literally:    t3('Dosłownie',                     'Letteralmente',          'Literally'),
+    exampleLbl:   t3('Przykład',                      'Esempio',                'Example'),
+    didYouKnow:   t3('Czy wiesz, że…',               'Lo sapevi che…',         'Did you know…'),
+    regional:     t3('Różnice regionalne',            'Varianti regionali',     'Regional variants'),
+    apiKey:       t3('Zmień klucz API',               'Cambia chiave API',      'Change API key'),
+    voiceFound:   t3('Głos znaleziony',               'Voce italiana trovata',  'Voice found'),
+    voiceMissing: t3('Brak głosu',                    'Nessuna voce italiana',  'No voice found'),
     diffLabels: {
-      A1: { pl: 'Początkujący', it: 'Principiante' },
-      A2: { pl: 'Elementarny',  it: 'Elementare' },
-      B1: { pl: 'Średniozaaw.', it: 'Intermedio' },
-      B2: { pl: 'Wyższy śred.', it: 'Interm. sup.' },
-      C1: { pl: 'Zaawansowany', it: 'Avanzato' },
+      A1: { pl: 'Początkujący', it: 'Principiante', en: 'Beginner' },
+      A2: { pl: 'Elementarny',  it: 'Elementare',   en: 'Elementary' },
+      B1: { pl: 'Średniozaaw.', it: 'Intermedio',   en: 'Intermediate' },
+      B2: { pl: 'Wyższy śred.', it: 'Interm. sup.', en: 'Upper-Interm.' },
+      C1: { pl: 'Zaawansowany', it: 'Avanzato',     en: 'Advanced' },
     },
   };
 
   const NAV_ITEMS = [
-    { id: 'intro',        pl: 'Wstęp',       it: 'Intro',       icon: SparklesIcon },
-    { id: 'vocab',        pl: 'Słownictwo',  it: 'Lessico',     icon: BookOpenIcon },
-    { id: 'grammar',      pl: 'Gramatyka',   it: 'Grammatica',  icon: AcademicCapIcon },
-    { id: 'phrases',      pl: 'Zwroty',      it: 'Frasi',       icon: ChatBubbleBottomCenterTextIcon },
-    { id: 'mistakes',     pl: 'Błędy',       it: 'Errori',      icon: ExclamationTriangleIcon },
-    { id: 'story',        pl: 'Opowiadanie', it: 'Racconto',    icon: BookmarkIcon },
-    { id: 'dialogue',     pl: 'Dialog',      it: 'Dialogo',     icon: LanguageIcon },
-    { id: 'culture',      pl: 'Kultura',     it: 'Cultura',     icon: GlobeEuropeAfricaIcon },
-    { id: 'gems',         pl: 'Perełki',     it: 'Gemme',       icon: StarIcon },
+    { id: 'intro',    pl: 'Wstęp',       it: 'Intro',      en: 'Intro',      icon: SparklesIcon },
+    { id: 'vocab',    pl: 'Słownictwo',  it: 'Lessico',    en: 'Vocabulary', icon: BookOpenIcon },
+    { id: 'grammar',  pl: 'Gramatyka',   it: 'Grammatica', en: 'Grammar',    icon: AcademicCapIcon },
+    { id: 'phrases',  pl: 'Zwroty',      it: 'Frasi',      en: 'Phrases',    icon: ChatBubbleBottomCenterTextIcon },
+    { id: 'mistakes', pl: 'Błędy',       it: 'Errori',     en: 'Mistakes',   icon: ExclamationTriangleIcon },
+    { id: 'story',    pl: 'Opowiadanie', it: 'Racconto',   en: 'Story',      icon: BookmarkIcon },
+    { id: 'dialogue', pl: 'Dialog',      it: 'Dialogo',    en: 'Dialogue',   icon: LanguageIcon },
+    { id: 'culture',  pl: 'Kultura',     it: 'Cultura',    en: 'Culture',    icon: GlobeEuropeAfricaIcon },
+    { id: 'gems',     pl: 'Perełki',     it: 'Gemme',      en: 'Gems',       icon: StarIcon },
   ];
 
   const speakerSides = useMemo<Record<string, 'left' | 'right'>>(() => {
@@ -790,52 +829,82 @@ export const LessonView: React.FC<LessonViewProps> = ({ lesson, onBack, onChange
 
       {/* ── Sticky top bar ─────────────────────────────────────────────────── */}
       <div className="glass-nav sticky top-0 z-50">
-        <div className="max-w-screen-2xl mx-auto px-4 h-11 flex items-center gap-2">
+        <div className="max-w-screen-2xl mx-auto px-4 h-12 flex items-center gap-1">
 
+          {/* Powrót */}
           <button
             onClick={onBack}
-            className="flex items-center gap-1.5 font-medium text-xs shrink-0"
-            style={{ color: 'var(--c-muted)' }}
+            className="nav-icon-btn shrink-0"
+            style={{ width: 'auto', padding: '0 10px', gap: 6 }}
+            title={L.library}
           >
             <ArrowLeftIcon className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">{L.library}</span>
+            <span className="hidden sm:inline text-xs font-medium">{L.library}</span>
           </button>
 
+          {/* Tytuł lekcji — środek */}
           <div className="flex-1 min-w-0 hidden md:block text-center">
             <p className="text-xs font-serif font-semibold truncate" style={{ color: 'var(--c-muted)' }}>
-              {l === 'it' ? lesson.topic.it : lesson.topic.pl}
+              {l === 'pl' ? lesson.topic.pl : tl(lesson.topic)}
             </p>
           </div>
 
-          <div className="flex items-center gap-1.5 shrink-0 ml-auto">
+          {/* Prawa strona */}
+          <div className="flex items-center gap-1 ml-auto">
+            {/* Szybkość TTS */}
             <button
               onClick={() => setRate(r => r === 0.9 ? 0.6 : 0.9)}
               title={hasItalianVoice ? L.voiceFound : L.voiceMissing}
-              className="hidden sm:flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold border"
+              className="nav-icon-btn hidden sm:flex"
               style={hasItalianVoice
-                ? { background: 'var(--c-green-dim)', color: 'var(--c-green)', borderColor: 'rgba(0,140,69,.2)' }
-                : { background: 'rgba(245,158,11,.08)', color: '#b45309', borderColor: 'rgba(245,158,11,.3)' }
+                ? { background: 'var(--c-green-dim)', color: 'var(--c-green)', borderColor: 'rgba(0,140,69,.2)', width: 'auto', padding: '0 8px', gap: 4 }
+                : { background: 'rgba(245,158,11,.08)', color: '#b45309', borderColor: 'rgba(245,158,11,.3)', width: 'auto', padding: '0 8px', gap: 4 }
               }
             >
-              {hasItalianVoice ? '🇮🇹' : '⚠️'}
-              <SpeakerWaveIcon className="w-3 h-3" />
-              {rate === 0.9 ? '1×' : '0.6×'}
+              {hasItalianVoice ? <Flag code={targetLang} size={14} aria-hidden="true" /> : <span aria-hidden="true">⚠️</span>}
+              <SpeakerWaveIcon className="w-3.5 h-3.5" />
+              <span className="text-xs font-bold">{rate === 0.9 ? '1×' : '0.6×'}</span>
             </button>
 
+            {/* Rozmiar czcionki */}
+            <div className="flex items-center rounded-full border overflow-hidden" style={{ borderColor: 'var(--c-border)', background: 'var(--c-surface)' }}>
+              <button
+                onClick={decreaseFontSize}
+                disabled={fontSizeIndex === 0}
+                title="Mniejsza czcionka"
+                className="nav-icon-btn rounded-none border-0 disabled:opacity-30"
+                style={{ width: 30, height: 30, fontSize: 11 }}
+              >
+                A<sup style={{ fontSize: 7 }}>−</sup>
+              </button>
+              <div className="w-px h-4 shrink-0" style={{ background: 'var(--c-border)' }} />
+              <button
+                onClick={increaseFontSize}
+                disabled={fontSizeIndex === 4}
+                title="Większa czcionka"
+                className="nav-icon-btn rounded-none border-0 disabled:opacity-30"
+                style={{ width: 30, height: 30, fontSize: 13 }}
+              >
+                A<sup style={{ fontSize: 8 }}>+</sup>
+              </button>
+            </div>
+
+            {/* Język */}
             <button
               onClick={toggleGlobal}
-              className="flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-bold active:scale-95"
-              style={{ background: 'var(--c-text)', color: theme === 'dark' ? '#13151b' : '#fff' }}
+              className="nav-icon-btn font-bold text-xs"
+              style={{ background: 'var(--c-text)', color: theme === 'dark' ? '#13151b' : '#fff', width: 'auto', padding: '0 10px', gap: 4 }}
             >
-              <LanguageIcon className="w-3 h-3" />
-              {l === 'it' ? '🇮🇹 IT' : '🇵🇱 PL'}
+              <LanguageIcon className="w-3.5 h-3.5 shrink-0" />
+              <span>{l === 'pl' ? 'PL' : l === 'en' ? 'EN' : 'IT'}</span>
+              <LangFlag lang={l} size={14} />
             </button>
 
-            {/* Przełącznik motywu */}
+            {/* Motyw */}
             <button
               onClick={toggleTheme}
               title={theme === 'dark' ? 'Tryb jasny' : 'Tryb ciemny'}
-              className="theme-toggle"
+              className="nav-icon-btn"
             >
               {theme === 'dark'
                 ? <SunIcon className="w-4 h-4 theme-icon-enter" />
@@ -843,32 +912,32 @@ export const LessonView: React.FC<LessonViewProps> = ({ lesson, onBack, onChange
               }
             </button>
 
-            {/* Favorite button */}
+            {/* Ulubione */}
             <button
               onClick={handleToggleFav}
-              title={isFav ? (l === 'it' ? 'Rimuovi dai preferiti' : 'Usuń z ulubionych') : (l === 'it' ? 'Aggiungi ai preferiti' : 'Dodaj do ulubionych')}
-              className={`fav-btn ${isFav ? 'active' : ''}`}
+              title={isFav ? t3('Usuń z ulubionych', 'Rimuovi dai preferiti', 'Remove from favourites') : t3('Dodaj do ulubionych', 'Aggiungi ai preferiti', 'Add to favourites')}
+              className={`nav-icon-btn ${isFav ? 'fav-active' : ''}`}
             >
-              {isFav ? <StarSolidIcon className="w-3.5 h-3.5" /> : <StarIcon className="w-3.5 h-3.5" />}
+              {isFav ? <StarSolidIcon className="w-4 h-4" style={{ color: '#f59e0b' }} /> : <StarIcon className="w-4 h-4" />}
             </button>
 
-            {/* Quiz button */}
+            {/* Quiz */}
             <button
               onClick={() => setShowQuiz(true)}
-              title={(l === 'it' ? 'Quiz vocabolario' : 'Quiz słownictwa') + ' [Q]'}
-              className="hidden sm:flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold border transition-all"
-              style={{ background: 'var(--c-green-dim)', color: 'var(--c-green)', borderColor: 'rgba(0,140,69,.2)' }}
+              title={t3('Quiz słownictwa', 'Quiz vocabolario', 'Vocabulary quiz') + ' [Q]'}
+              className="nav-icon-btn hidden sm:flex"
+              style={{ background: 'var(--c-green-dim)', color: 'var(--c-green)', borderColor: 'rgba(0,140,69,.2)', width: 'auto', padding: '0 10px', gap: 4 }}
             >
-              <TrophyIcon className="w-3 h-3" />
-              {l === 'it' ? 'Quiz' : 'Quiz'}
+              <TrophyIcon className="w-3.5 h-3.5" />
+              <span className="text-xs font-bold">Quiz</span>
             </button>
 
+            {/* Klucz API */}
             {onChangeKey && (
               <button
                 onClick={onChangeKey}
                 title={L.apiKey}
-                className="p-1.5 rounded-lg"
-                style={{ color: 'var(--c-faint)' }}
+                className="nav-icon-btn"
               >
                 <KeyIcon className="w-3.5 h-3.5" />
               </button>
@@ -885,14 +954,14 @@ export const LessonView: React.FC<LessonViewProps> = ({ lesson, onBack, onChange
           <aside className="hidden lg:block lg:col-span-2">
             <div className="sticky top-14 space-y-0.5">
               <p className="micro-label mb-2 pl-2">{L.toc}</p>
-              {NAV_ITEMS.map(({ id, pl, it, icon: Icon }) => (
+              {NAV_ITEMS.map(({ id, pl, it, en, icon: Icon }) => (
                 <button
                   key={id}
                   onClick={() => scrollTo(id)}
                   className={`nav-btn ${activeSection === id ? 'active' : ''}`}
                 >
                   <Icon />
-                  {l === 'it' ? it : pl}
+                  {l === 'pl' ? pl : isEn ? en : it}
                 </button>
               ))}
 
@@ -928,11 +997,11 @@ export const LessonView: React.FC<LessonViewProps> = ({ lesson, onBack, onChange
                 <div className="flex flex-col gap-1 pt-1 border-t" style={{ borderColor: 'var(--c-border-soft)' }}>
                   <div className="flex items-center gap-1.5 text-[9px]" style={{ color: 'var(--c-faint)' }}>
                     <span className="kbd">Q</span>
-                    <span>{l === 'it' ? 'avvia quiz' : 'uruchom quiz'}</span>
+                    <span>{t3('uruchom quiz', 'avvia quiz', 'start quiz')}</span>
                   </div>
                   <div className="flex items-center gap-1.5 text-[9px]" style={{ color: 'var(--c-faint)' }}>
                     <span className="kbd">Esc</span>
-                    <span>{l === 'it' ? 'torna alla biblioteca' : 'wróć do biblioteki'}</span>
+                    <span>{t3('wróć do biblioteki', 'torna alla biblioteca', 'back to library')}</span>
                   </div>
                 </div>
               </div>
@@ -978,16 +1047,16 @@ export const LessonView: React.FC<LessonViewProps> = ({ lesson, onBack, onChange
                     {L.readMins(lesson.estimated_reading_minutes ?? 0)}
                   </span>
                   <span style={{ color: 'var(--c-faint)' }}>
-                    {new Date(lesson.timestamp).toLocaleDateString(l === 'it' ? 'it-IT' : 'pl-PL')}
+                    {new Date(lesson.timestamp).toLocaleDateString(l === 'pl' ? 'pl-PL' : l === 'en' ? 'en-GB' : 'it-IT')}
                   </span>
                 </div>
 
                 <div className="max-w-2xl mx-auto text-left space-y-2">
-                  <p className="text-base leading-relaxed font-light" style={{ color: 'var(--c-muted)' }}>
+                  <p className="text-base leading-relaxed font-light text-justify-block" style={{ color: 'var(--c-muted)' }}>
                     <B content={lesson.introduction} />
                   </p>
                   <SpeakBtn
-                    italianText={lesson.introduction.it}
+                    italianText={tl(lesson.introduction)}
                     id="intro-text"
                     speak={speak} stop={stop} speakId={speakId}
                     label={L.listenIntro}
@@ -1018,23 +1087,52 @@ export const LessonView: React.FC<LessonViewProps> = ({ lesson, onBack, onChange
               <SectionHeading
                 id="vocab"
                 icon={BookOpenIcon}
-                title={l === 'it' ? 'Lessico & Dettagli' : 'Słownictwo i szczegóły'}
-                subtitle={l === 'it' ? 'Clicca ▼ per etimologia, sinonimi e famiglia' : 'Kliknij ▼ by rozwinąć etymologię, synonimy i rodzinę'}
+                title={t3('Słownictwo i szczegóły', 'Lessico & Dettagli', 'Vocabulary & Details')}
+                subtitle={t3('Kliknij ▼ by rozwinąć etymologię, synonimy i rodzinę', 'Clicca ▼ per etimologia, sinonimi e famiglia', 'Click ▼ for etymology, synonyms and word family')}
               />
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2">
                 {lesson.vocabulary.map((item, i) => (
                   <VocabCard key={i} item={item} cardId={`vocab-${i}`}
                     speak={speak} stop={stop} speakId={speakId} />
                 ))}
+                {Array.from({ length: Math.max(0, 15 - lesson.vocabulary.length) }).map((_, i) => (
+                  <VocabCardSkeleton key={`skel-${i}`} index={lesson.vocabulary.length + i} />
+                ))}
               </div>
             </section>
+
+            {/* ═══ DEEP DIVE ═══════════════════════════════════════════════ */}
+            {lesson.deep_dive && (
+              <section>
+                <div className="card overflow-hidden">
+                  <div className="px-6 py-4 border-b flex items-center gap-2"
+                    style={{ background: 'var(--c-bg)', borderColor: 'var(--c-border)' }}>
+                    <BookOpenIcon className="w-4 h-4 shrink-0" style={{ color: 'var(--c-green)' }} />
+                    <h2 className="text-base font-serif font-bold" style={{ color: 'var(--c-text)' }}>
+                      {t3('Pogłębiona analiza', 'Approfondimento', 'Deep Dive')}
+                    </h2>
+                  </div>
+                  <div className="p-6 space-y-3">
+                    <p className="text-sm leading-relaxed text-justify-block" style={{ color: 'var(--c-muted)' }}>
+                      <B content={lesson.deep_dive} />
+                    </p>
+                    <SpeakBtn
+                      italianText={tl(lesson.deep_dive)}
+                      id="deep-dive-text"
+                      speak={speak} stop={stop} speakId={speakId}
+                      label={L.listenCulture}
+                    />
+                  </div>
+                </div>
+              </section>
+            )}
 
             {/* ═══ GRAMATYKA ═══════════════════════════════════════════════ */}
             <section>
               <SectionHeading
                 id="grammar"
                 icon={AcademicCapIcon}
-                title={l === 'it' ? 'Focus Grammaticale' : 'Focus gramatyczny'}
+                title={t3('Focus gramatyczny', 'Focus Grammaticale', 'Grammar Focus')}
               />
               <div className="space-y-4">
                 {lesson.grammar.map((g, gi) => (
@@ -1052,7 +1150,7 @@ export const LessonView: React.FC<LessonViewProps> = ({ lesson, onBack, onChange
                       )}
                     </div>
                     <div className="p-5 space-y-3">
-                      <p className="text-sm leading-relaxed" style={{ color: 'var(--c-muted)' }}>
+                      <p className="text-sm leading-relaxed text-justify-block" style={{ color: 'var(--c-muted)' }}>
                         <B content={g.explanation} />
                       </p>
                       <div className="space-y-1.5">
@@ -1061,7 +1159,7 @@ export const LessonView: React.FC<LessonViewProps> = ({ lesson, onBack, onChange
                           <div key={j} className="flex gap-2 items-start p-2.5 rounded-lg"
                             style={{ background: 'var(--c-bg)', border: '1px solid var(--c-border-soft)' }}>
                             <SpeakBtn
-                              italianText={ex.it}
+                              italianText={tl(ex)}
                               id={`gram-${gi}-${j}`}
                               speak={speak} stop={stop} speakId={speakId}
                               label=""
@@ -1100,7 +1198,7 @@ export const LessonView: React.FC<LessonViewProps> = ({ lesson, onBack, onChange
               <SectionHeading
                 id="phrases"
                 icon={ChatBubbleBottomCenterTextIcon}
-                title={l === 'it' ? 'Frasi Utili' : 'Przydatne zwroty'}
+                title={t3('Przydatne zwroty', 'Frasi Utili', 'Useful Phrases')}
               />
               <div className="rounded-2xl overflow-hidden shadow-lg"
                 style={{ background: 'var(--c-phrases-bg)' }}>
@@ -1119,8 +1217,9 @@ export const LessonView: React.FC<LessonViewProps> = ({ lesson, onBack, onChange
                           className="text-slate-500"
                         />
                         {ph.register && (
-                          <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded border ${REGISTER_STYLE[ph.register]}`}>
-                            {REG_LABEL[ph.register]?.[l] ?? ph.register}
+                          <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded border"
+                            style={REGISTER_STYLE[ph.register]}>
+                            {REG_LABEL[ph.register]?.[l === 'pl' ? 'pl' : 'it'] ?? ph.register}
                           </span>
                         )}
                       </div>
@@ -1142,8 +1241,8 @@ export const LessonView: React.FC<LessonViewProps> = ({ lesson, onBack, onChange
               <SectionHeading
                 id="mistakes"
                 icon={ExclamationTriangleIcon}
-                title={l === 'it' ? 'Attenzione agli Errori' : 'Uwaga na błędy'}
-                subtitle={l === 'it' ? 'Trappole per chi parla polacco' : 'Pułapki dla Polaków uczących się włoskiego'}
+                title={t3('Uwaga na błędy', 'Attenzione agli Errori', 'Watch Out for Mistakes')}
+                subtitle={t3('Pułapki dla Polaków uczących się', 'Trappole per chi parla polacco', 'Common traps for Polish speakers')}
               />
               <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                 {lesson.common_mistakes.map((m, i) => {
@@ -1152,7 +1251,7 @@ export const LessonView: React.FC<LessonViewProps> = ({ lesson, onBack, onChange
                     <div key={i} className="card overflow-hidden">
                       <div className="px-3 py-1.5" style={{ background: MISTAKE_BG[cat] }}>
                         <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: MISTAKE_TEXT[cat] }}>
-                          {MISTAKE_LABEL[cat]?.[l] ?? cat}
+                          {MISTAKE_LABEL[cat]?.[l === 'pl' ? 'pl' : 'it'] ?? cat}
                         </span>
                       </div>
                       <div className="p-4 space-y-3">
@@ -1167,7 +1266,7 @@ export const LessonView: React.FC<LessonViewProps> = ({ lesson, onBack, onChange
                             <p className="font-mono text-xs font-bold" style={{ color: 'var(--c-text)' }}>{m.correct}</p>
                           </div>
                         </div>
-                        <p className="text-xs leading-relaxed" style={{ color: 'var(--c-muted)' }}>
+                        <p className="text-xs leading-relaxed text-justify-block" style={{ color: 'var(--c-muted)' }}>
                           <B content={m.explanation} />
                         </p>
                         {m.mnemonic && (
@@ -1190,8 +1289,8 @@ export const LessonView: React.FC<LessonViewProps> = ({ lesson, onBack, onChange
                 <SectionHeading
                   id="story"
                   icon={BookmarkIcon}
-                  title={l === 'it' ? 'Breve Racconto' : 'Krótkie opowiadanie'}
-                  subtitle={l === 'it' ? 'Lessico nel contesto narrativo' : 'Słownictwo w kontekście narracyjnym'}
+                  title={t3('Krótkie opowiadanie', 'Breve Racconto', 'Short Story')}
+                  subtitle={t3('Słownictwo w kontekście narracyjnym', 'Lessico nel contesto narrativo', 'Vocabulary in narrative context')}
                 />
                 <div className="card overflow-hidden relative">
                   <div className="absolute top-4 left-4 text-7xl font-serif leading-none select-none pointer-events-none"
@@ -1200,12 +1299,12 @@ export const LessonView: React.FC<LessonViewProps> = ({ lesson, onBack, onChange
                     <h3 className="text-lg font-serif font-bold mb-4" style={{ color: 'var(--c-text)' }}>
                       <B content={lesson.mini_story.title} />
                     </h3>
-                    <div className="prose prose-slate max-w-none text-base font-light leading-relaxed" style={{ color: 'var(--c-muted)' }}>
+                    <div className="prose prose-slate max-w-none text-base font-light leading-relaxed text-justify-block" style={{ color: 'var(--c-muted)' }}>
                       <B content={lesson.mini_story.text} as="p" />
                     </div>
                     <div className="mt-3">
                       <SpeakBtn
-                        italianText={lesson.mini_story.text.it}
+                        italianText={tl(lesson.mini_story.text)}
                         id="story-text"
                         speak={speak} stop={stop} speakId={speakId}
                         label={L.listenStory}
@@ -1225,12 +1324,39 @@ export const LessonView: React.FC<LessonViewProps> = ({ lesson, onBack, onChange
               </section>
             )}
 
+            {/* ═══ ZAMKNIĘCIE / REFLEKSJA ══════════════════════════════════ */}
+            {lesson.closing_reflection && (
+              <section>
+                <div className="card overflow-hidden relative">
+                  <div className="absolute top-4 left-4 text-7xl font-serif leading-none select-none pointer-events-none"
+                    style={{ color: 'var(--c-border-soft)', zIndex: 0 }}>✦</div>
+                  <div className="relative p-6 md:p-8 space-y-3" style={{ zIndex: 1 }}>
+                    <div className="flex items-center gap-2 mb-1">
+                      <SparklesIcon className="w-4 h-4 shrink-0" style={{ color: 'var(--c-green)' }} />
+                      <h2 className="text-base font-serif font-bold" style={{ color: 'var(--c-text)' }}>
+                        {t3('Refleksja końcowa', 'Riflessione finale', 'Closing Reflection')}
+                      </h2>
+                    </div>
+                    <p className="text-sm leading-relaxed text-justify-block font-light" style={{ color: 'var(--c-muted)' }}>
+                      <B content={lesson.closing_reflection} />
+                    </p>
+                    <SpeakBtn
+                      italianText={tl(lesson.closing_reflection)}
+                      id="closing-reflection-text"
+                      speak={speak} stop={stop} speakId={speakId}
+                      label={t3('Odsłuchaj refleksję', 'Ascolta riflessione', 'Listen to reflection')}
+                    />
+                  </div>
+                </div>
+              </section>
+            )}
+
             {/* ═══ DIALOG ══════════════════════════════════════════════════ */}
             <section>
               <SectionHeading
                 id="dialogue"
                 icon={LanguageIcon}
-                title={l === 'it' ? 'Dialogo in Contesto' : 'Dialog w kontekście'}
+                title={t3('Dialog w kontekście', 'Dialogo in Contesto', 'Dialogue in Context')}
               />
 
               {/* Dialog header */}
@@ -1248,7 +1374,7 @@ export const LessonView: React.FC<LessonViewProps> = ({ lesson, onBack, onChange
                     )}
                   </div>
                   <SpeakBtn
-                    italianText={lesson.dialogue.lines.map(lin => lin.text.it).join('. ')}
+                    italianText={lesson.dialogue.lines.map(lin => tl(lin.text)).join('. ')}
                     id="dialogue-full"
                     speak={speak} stop={stop} speakId={speakId}
                     label={L.playDialogue}
@@ -1331,14 +1457,14 @@ export const LessonView: React.FC<LessonViewProps> = ({ lesson, onBack, onChange
                             )}
                             <p
                               className="text-sm leading-relaxed cursor-pointer hover:opacity-75 transition-opacity select-text"
-                              onClick={() => speak(line.text.it, `line-${i}`)}
-                              title={l === 'it' ? 'Clicca per ascoltare' : 'Kliknij by odsłuchać'}
+                              onClick={() => speak(tl(line.text), `line-${i}`)}
+                              title={t3('Kliknij by odsłuchać', 'Clicca per ascoltare', 'Click to listen')}
                             >
                               <B content={line.text} />
                             </p>
                             <div className={`mt-1 flex ${isRight ? 'justify-end' : 'justify-start'}`}>
                               <SpeakBtn
-                                italianText={line.text.it}
+                                italianText={tl(line.text)}
                                 id={`line-${i}`}
                                 speak={speak} stop={stop} speakId={speakId}
                                 label=""
@@ -1367,7 +1493,7 @@ export const LessonView: React.FC<LessonViewProps> = ({ lesson, onBack, onChange
               <SectionHeading
                 id="culture"
                 icon={GlobeEuropeAfricaIcon}
-                title={l === 'it' ? 'Cultura & Società' : 'Kultura i społeczeństwo'}
+                title={t3('Kultura i społeczeństwo', 'Cultura & Società', 'Culture & Society')}
               />
               <div className="space-y-4">
                 <div className="card overflow-hidden">
@@ -1378,11 +1504,11 @@ export const LessonView: React.FC<LessonViewProps> = ({ lesson, onBack, onChange
                     </h3>
                   </div>
                   <div className="p-6 space-y-3">
-                    <div className="prose prose-slate max-w-none text-sm leading-relaxed" style={{ color: 'var(--c-muted)' }}>
+                    <div className="prose prose-slate max-w-none text-sm leading-relaxed text-justify-block" style={{ color: 'var(--c-muted)' }}>
                       <B content={lesson.culture.content} as="p" />
                     </div>
                     <SpeakBtn
-                      italianText={lesson.culture.content.it}
+                      italianText={tl(lesson.culture.content)}
                       id="culture-content"
                       speak={speak} stop={stop} speakId={speakId}
                       label={L.listenCulture}
@@ -1417,7 +1543,7 @@ export const LessonView: React.FC<LessonViewProps> = ({ lesson, onBack, onChange
                             )}
                           </div>
                         </div>
-                        <p className="text-xs leading-relaxed" style={{ color: 'var(--c-muted)' }}>
+                        <p className="text-xs leading-relaxed text-justify-block" style={{ color: 'var(--c-muted)' }}>
                           <B content={note.content} />
                         </p>
                       </div>
@@ -1445,8 +1571,8 @@ export const LessonView: React.FC<LessonViewProps> = ({ lesson, onBack, onChange
               <SectionHeading
                 id="gems"
                 icon={StarIcon}
-                title={l === 'it' ? 'Perle della Lingua' : 'Językowe perełki'}
-                subtitle={l === 'it' ? 'Proverbio e modo di dire' : 'Przysłowie i idiom'}
+                title={t3('Językowe perełki', 'Perle della Lingua', 'Language Gems')}
+                subtitle={t3('Przysłowie i idiom', 'Proverbio e modo di dire', 'Proverb and idiom')}
               />
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
 
@@ -1457,7 +1583,7 @@ export const LessonView: React.FC<LessonViewProps> = ({ lesson, onBack, onChange
                       <div className="flex items-center gap-2" style={{ color: '#92400e' }}>
                         <span className="text-base">📜</span>
                         <span className="micro-label" style={{ color: '#b45309' }}>
-                          {l === 'it' ? 'Proverbio italiano' : 'Włoskie przysłowie'}
+                          {t3('Przysłowie', 'Proverbio italiano', 'Proverb')}
                         </span>
                       </div>
                       <blockquote className="text-xl font-serif font-bold italic leading-snug" style={{ color: 'var(--c-text)' }}>
@@ -1471,7 +1597,7 @@ export const LessonView: React.FC<LessonViewProps> = ({ lesson, onBack, onChange
                         </div>
                         <div>
                           <span className="micro-label block mb-0.5">{L.meaning}</span>
-                          <p className="text-xs italic" style={{ color: 'var(--c-muted)' }}><B content={lesson.proverb.meaning} /></p>
+                          <p className="text-xs italic text-justify-block" style={{ color: 'var(--c-muted)' }}><B content={lesson.proverb.meaning} /></p>
                         </div>
                       </div>
                     </div>
@@ -1485,7 +1611,7 @@ export const LessonView: React.FC<LessonViewProps> = ({ lesson, onBack, onChange
                       <div className="flex items-center gap-2" style={{ color: '#a5b4fc' }}>
                         <LightBulbIcon className="w-3.5 h-3.5" />
                         <span className="micro-label" style={{ color: '#a5b4fc' }}>
-                          {l === 'it' ? 'Modo di dire' : 'Włoski idiom'}
+                          {t3('Idiom', 'Modo di dire', 'Idiom')}
                         </span>
                       </div>
                       <div>
@@ -1504,7 +1630,7 @@ export const LessonView: React.FC<LessonViewProps> = ({ lesson, onBack, onChange
                         style={{ background: 'rgba(255,255,255,.1)', border: '1px solid rgba(255,255,255,.1)' }}>
                         <div>
                           <span className="micro-label block mb-0.5" style={{ color: '#a5b4fc' }}>{L.meaning}</span>
-                          <p className="text-sm text-white font-medium"><B content={lesson.idiom.meaning} /></p>
+                          <p className="text-sm text-white font-medium text-justify-block"><B content={lesson.idiom.meaning} /></p>
                         </div>
                         <div style={{ borderTop: '1px solid rgba(255,255,255,.1)', paddingTop: '8px' }}>
                           <span className="micro-label block mb-0.5" style={{ color: '#a5b4fc' }}>{L.literally}</span>
@@ -1521,7 +1647,7 @@ export const LessonView: React.FC<LessonViewProps> = ({ lesson, onBack, onChange
                             <span className="micro-label block mb-0.5" style={{ color: '#a5b4fc' }}>{L.exampleLbl}</span>
                             <p className="text-xs italic" style={{ color: '#e0e7ff' }}><B content={lesson.idiom.example_sentence} /></p>
                             <SpeakBtn
-                              italianText={lesson.idiom.example_sentence.it}
+                              italianText={tl(lesson.idiom.example_sentence)}
                               id="idiom-example"
                               speak={speak} stop={stop} speakId={speakId}
                               className="mt-1"

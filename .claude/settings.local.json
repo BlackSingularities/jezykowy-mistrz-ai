@@ -3,7 +3,9 @@
     "allow": [
       "Bash(dir:*)",
       "Bash(npx tsc:*)",
-      "Bash(del \"H:\\\\Piaskownica\\\\!!Githubownik\\\\wloski-mistrz-ai\\\\components\\\\QuizSection.tsx\")"
+      "Bash(del \"H:\\\\Piaskownica\\\\!!Githubownik\\\\wloski-mistrz-ai\\\\components\\\\QuizSection.tsx\")",
+      "WebFetch(domain:openrouter.ai)",
+      "Bash(npm run build:*)"
     ]
   }
 }
