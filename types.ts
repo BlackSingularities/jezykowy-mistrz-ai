@@ -32,6 +32,7 @@ export interface VocabularyItem {
   part_of_speech: PartOfSpeech;
   register?: Register;
   translation: string;              // main Polish translation
+  english_translation?: string;     // English translation (for Italian lessons)
   definition: Bilingual;
   context_sentence: Bilingual;
   audio_hint?: string;              // phonetic tip e.g. "gn -> ń"
@@ -180,8 +181,10 @@ export interface Lesson {
   regional_notes?: Bilingual;
 
   // deep reading blocks — two extended thematic prose sections
-  deep_dive?: Bilingual;          // after vocabulary: in-depth thematic exploration
-  closing_reflection?: Bilingual; // after dialogue: reflective / narrative closing
+  deep_dive?: Bilingual;               // after vocabulary: in-depth thematic exploration
+  deep_dive_title?: Bilingual;         // AI-generated section title for deep dive
+  closing_reflection?: Bilingual;      // after dialogue: reflective / narrative closing
+  closing_reflection_title?: Bilingual; // AI-generated section title for closing reflection
 }
 
 // ─── App State ────────────────────────────────────────────────────────────────

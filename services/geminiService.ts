@@ -51,13 +51,21 @@ const lessonSchema = {
     regional_notes: { ...optB, description: "Detailed regional variations in Italy — minimum 4 sentences. Mention specific regions, dialects, and how usage/meaning/custom differs across the peninsula." },
 
     // ── Deep-dive blocks ────────────────────────────────────────────────────
+    deep_dive_title: {
+      ...B,
+      description: "A precise, encyclopedic section title for the deep-dive section — factual and topic-specific, like an encyclopedia chapter heading. Should be concise (3–7 words) and directly name the subject matter, e.g. 'Storia e origini della cucina napoletana' or 'Anatomia del gesto italiano'. No fluff, no 'journey' metaphors.",
+    },
     deep_dive: {
       ...B,
-      description: "An in-depth thematic exploration of the topic — a sustained analytical or narrative prose piece of minimum 250 words per language. This is NOT a summary; it goes BEYOND the introduction into the cultural, historical, or linguistic heart of the topic. Think of it as a magazine feature article: immersive, opinionated, rich with specific facts, names, dates, and regional detail. It should feel like a natural continuation of the introduction, opening a new layer of depth that the introduction only hinted at.",
+      description: "An authoritative, encyclopedic in-depth analysis of the topic — minimum 250 words per language. Written in the style of a reference work or scholarly essay: factual, structured, with specific data, dates, names, and regional distinctions. Avoid any narrative framing of 'a lesson' or 'a journey'; write as if for an encyclopedia or cultural dictionary. Go beyond the introduction into the historical, linguistic, and socio-cultural dimensions of the topic.",
+    },
+    closing_reflection_title: {
+      ...B,
+      description: "A precise, encyclopedic section title for the closing reflection — factual and thematic, like a conclusion chapter in a reference book. E.g. 'Rilievo linguistico e prospettive' or 'Sintesi culturale e note comparate'. No motivational or journey-based phrasing.",
     },
     closing_reflection: {
       ...B,
-      description: "A thoughtful closing essay that synthesises the lesson — minimum 200 words per language. This is the 'after the dialogue' moment: reflect on what was learned, zoom out to the bigger picture, draw connections between the vocabulary, grammar, and cultural topics. Tone: warm, literary, slightly philosophical. It may include an anecdote, a brief personal observation from the perspective of an Italian cultural expert, or a forward-looking invitation to explore further.",
+      description: "A substantive closing synthesis — minimum 200 words per language. Written in a scholarly, encyclopedic register: synthesise the linguistic, cultural, and grammatical dimensions of the topic, draw comparisons with Polish, and point toward further study. Tone: authoritative, precise, intellectually rigorous. Avoid narrative frameworks like 'we have now completed our journey'; write as an expert summing up a reference entry.",
     },
 
     // ── Vocabulary ───────────────────────────────────────────────────────────
@@ -276,11 +284,10 @@ const lessonSchema = {
   required: [
     "topic","subtitle","emoji","tags","difficulty_level","estimated_reading_minutes",
     "introduction","key_takeaways",
-    "deep_dive",
-    "vocabulary",
+    "deep_dive_title","deep_dive",
     "grammar","common_mistakes","useful_phrases",
     "mini_story","dialogue",
-    "closing_reflection",
+    "closing_reflection_title","closing_reflection",
     "culture","cultural_notes",
     "proverb","idiom",
   ],
@@ -380,7 +387,7 @@ Tone: Engaging, magazine-quality, culturally immersive, intellectually serious.
 MANDATORY requirements — failure to meet ANY of these is unacceptable:
 1. ALL prose fields must be long and substantive — see the length requirements in the system prompt.
 2. ALL explanations and prose must be provided in BOTH Italian and Polish — every "Bilingual" field has "it" and "pl" keys.
-3. Vocabulary: EXACTLY 15–20 items (10 core + 5–10 bonus). IPA, gender/plural for all nouns, register, etymology (minimum 2 sentences), synonyms (3+), word family (3+), rich definitions (2–3 sentences).
+3. DO NOT include a "vocabulary" field — vocabulary is generated separately.
 4. Grammar: 3 sections minimum, each with ≥ 5-sentence explanations and ≥ 4 example pairs.
 5. Common mistakes: SPECIFIC to Polish speakers — name the Polish word causing interference. ≥ 5 mistakes total.
 6. Mini-story: ≥ 200 words per language, literary quality, named Italian characters, specific Italian location.
@@ -390,12 +397,12 @@ MANDATORY requirements — failure to meet ANY of these is unacceptable:
 10. Proverb: must be a REAL Italian proverb. Meaning field ≥ 4 sentences per language.
 11. Idiom: genuine "modo di dire". Origin story required (≥ 3 sentences per language).
 12. Phrases: 8 items, each with detailed context ≥ 2–3 sentences per language.
-13. deep_dive: ≥ 250 words per language — an immersive analytical/cultural feature placed AFTER the introduction. Must go deeper than the introduction, with specific facts, anecdotes, and cultural/historical analysis.
-14. closing_reflection: ≥ 200 words per language — a warm, literary synthesis placed AFTER the dialogue, connecting vocabulary, grammar, and culture into a cohesive closing thought.
+13. deep_dive_title: concise encyclopedic section title (3–7 words, topic-specific, like an encyclopedia chapter). deep_dive: ≥ 250 words per language — authoritative, encyclopedic analysis. NO "lesson/journey" framing — write as a reference work.
+14. closing_reflection_title: concise encyclopedic section title. closing_reflection: ≥ 200 words per language — scholarly synthesis of linguistic, cultural and grammatical dimensions. NO "lesson/journey" framing.
 
 CRITICAL — You MUST respond with a single valid JSON object. No markdown, no code fences, no extra text — ONLY the raw JSON.
 
-The JSON must match this exact structure:
+The JSON must match this exact structure (do NOT include a "vocabulary" field — it is generated separately):
 {
   "topic": {"it": "...", "pl": "..."},
   "subtitle": {"it": "...", "pl": "..."},
@@ -407,19 +414,8 @@ The JSON must match this exact structure:
   "key_takeaways": [{"it": "...", "pl": "..."}, {"it": "...", "pl": "..."}, {"it": "...", "pl": "..."}],
   "trivia": {"it": "...", "pl": "..."},
   "regional_notes": {"it": "...", "pl": "..."},
+  "deep_dive_title": {"it": "...", "pl": "..."},
   "deep_dive": {"it": "...", "pl": "..."},
-  "vocabulary": [
-    {
-      "word": "...", "ipa": "...", "gender": "m|f|pl|invariant", "plural": "...",
-      "part_of_speech": "noun|verb|adjective|adverb|phrase|interjection|conjunction|preposition",
-      "register": "formal|informal|colloquial|literary|regional|vulgar",
-      "translation": "...", "definition": {"it": "...", "pl": "..."},
-      "context_sentence": {"it": "...", "pl": "..."},
-      "audio_hint": "...", "etymology": {"it": "...", "pl": "..."},
-      "synonyms": ["...", "..."], "antonyms": ["...", "..."],
-      "word_family": [{"form": "...", "type": "...", "translation": "..."}]
-    }
-  ],
   "grammar": [
     {
       "title": {"it": "...", "pl": "..."},
@@ -450,7 +446,6 @@ The JSON must match this exact structure:
     "text": {"it": "...", "pl": "..."},
     "moral": {"it": "...", "pl": "..."}
   },
-  "closing_reflection": {"it": "...", "pl": "..."},
   "dialogue": {
     "title": {"it": "...", "pl": "..."},
     "setting": {"it": "...", "pl": "..."},
@@ -464,6 +459,8 @@ The JSON must match this exact structure:
     ],
     "vocabulary_highlight": ["...", "..."]
   },
+  "closing_reflection_title": {"it": "...", "pl": "..."},
+  "closing_reflection": {"it": "...", "pl": "..."},
   "culture": {
     "title": {"it": "...", "pl": "..."},
     "content": {"it": "...", "pl": "..."},
@@ -502,8 +499,12 @@ Remember: this resource must be so good that a learner could use it as their pri
 
   const data = JSON.parse(text);
 
+  // Generate vocabulary as a separate request with full lesson context
+  const vocabulary = await generateItalianVocabulary(data, apiKey, model || getSavedModel() || DEFAULT_MODEL, client);
+
   return {
     ...data,
+    vocabulary,
     id: typeof crypto !== "undefined" && crypto.randomUUID
       ? crypto.randomUUID()
       : `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
@@ -511,6 +512,92 @@ Remember: this resource must be so good that a learner could use it as their pri
     targetLang: 'it' as const,
   };
 };
+
+// ─── Italian Vocabulary Generation ────────────────────────────────────────────
+
+async function generateItalianVocabulary(
+  lessonData: Record<string, unknown>,
+  apiKey: string,
+  model: string,
+  client?: OpenAI
+): Promise<import('../types').VocabularyItem[]> {
+  const c = client ?? new OpenAI({ baseURL: "https://openrouter.ai/api/v1", apiKey, dangerouslyAllowBrowser: true });
+
+  const lessonSummary = JSON.stringify({
+    topic: lessonData.topic,
+    tags: lessonData.tags,
+    difficulty_level: lessonData.difficulty_level,
+    introduction: lessonData.introduction,
+    deep_dive: lessonData.deep_dive,
+    grammar: lessonData.grammar,
+    mini_story: lessonData.mini_story,
+    dialogue: lessonData.dialogue,
+  });
+
+  const response = await c.chat.completions.create({
+    model,
+    messages: [
+      {
+        role: "system",
+        content: `You are a specialist Italian lexicographer and vocabulary teacher for Polish speakers. You create precise, detailed, encyclopedic vocabulary entries for language learners. Your entries are accurate, pedagogically rich, and directly relevant to the topic at hand. You also provide English translations for each item.`,
+      },
+      {
+        role: "user",
+        content: `Based on the following Italian lesson content, generate a vocabulary list of EXACTLY 15 to 25 items (no fewer than 15, no more than 25). Choose the most important, topic-relevant Italian words and phrases — a mix of nouns, verbs, adjectives, adverbs, and set phrases. Prioritise words that actually appear or are strongly implied in the lesson text.
+
+LESSON CONTENT:
+${lessonSummary}
+
+For each vocabulary item provide:
+- word: the Italian word/phrase
+- ipa: full IPA phonetic transcription (e.g. /laˈvoːro/)
+- gender: "m", "f", "pl", or "invariant" (for nouns)
+- plural: plural form (for nouns)
+- part_of_speech: one of noun|verb|adjective|adverb|phrase|interjection|conjunction|preposition
+- register: one of formal|informal|colloquial|literary|regional|vulgar
+- translation: Polish translation (primary meaning, with nuances noted)
+- english_translation: English translation of the word
+- definition: {"it": "2–3 sentence definition in Italian explaining usage and nuances", "pl": "2–3 sentence definition in Polish"}
+- context_sentence: {"it": "A vivid, culturally specific Italian example sentence", "pl": "Polish translation of the sentence"}
+- audio_hint: pronunciation tip for Polish speakers (e.g. "gli = ʎ, jak polskie ль")
+- etymology: {"it": "2+ sentence etymology in Italian", "pl": "2+ sentence etymology in Polish"}
+- synonyms: array of 3–4 Italian synonyms with register notes
+- antonyms: array of 2–3 Italian antonyms (if applicable)
+- word_family: array of 3–4 related forms: [{"form": "...", "type": "noun/verb/adj", "translation": "Polish gloss"}]
+
+CRITICAL: Respond with ONLY a raw JSON object in this exact format:
+{
+  "vocabulary": [
+    {
+      "word": "...", "ipa": "...", "gender": "m|f|pl|invariant", "plural": "...",
+      "part_of_speech": "noun|verb|...",
+      "register": "formal|informal|...",
+      "translation": "...",
+      "english_translation": "...",
+      "definition": {"it": "...", "pl": "..."},
+      "context_sentence": {"it": "...", "pl": "..."},
+      "audio_hint": "...",
+      "etymology": {"it": "...", "pl": "..."},
+      "synonyms": ["...", "..."],
+      "antonyms": ["...", "..."],
+      "word_family": [{"form": "...", "type": "...", "translation": "..."}]
+    }
+  ]
+}`,
+      },
+    ],
+    response_format: { type: "json_object" },
+  });
+
+  const vocabText = response.choices[0]?.message?.content;
+  if (!vocabText) return [];
+  try {
+    const parsed = JSON.parse(vocabText);
+    return parsed.vocabulary ?? [];
+  } catch {
+    return [];
+  }
+}
 
 // ─── English Lesson Schema ────────────────────────────────────────────────────
 
@@ -578,7 +665,7 @@ Tone: Engaging, magazine-quality, culturally immersive, intellectually serious.
 MANDATORY requirements — failure to meet ANY of these is unacceptable:
 1. ALL prose fields must be long and substantive.
 2. ALL explanations and prose must be provided in BOTH English and Polish — every "Bilingual" field has "en" and "pl" keys (NOT "it").
-3. Vocabulary: EXACTLY 15–20 items (10 core + 5–10 bonus). IPA, register, etymology (minimum 2 sentences), synonyms (3+), word family (3+), rich definitions (2–3 sentences).
+3. DO NOT include a "vocabulary" field — vocabulary is generated separately.
 4. Grammar: 3 sections minimum, each with ≥ 5-sentence explanations and ≥ 4 example pairs.
 5. Common mistakes: SPECIFIC to Polish speakers — name the Polish word causing interference. ≥ 5 mistakes total.
 6. Mini-story: ≥ 200 words per language, literary quality, named characters.
@@ -588,12 +675,12 @@ MANDATORY requirements — failure to meet ANY of these is unacceptable:
 10. Proverb: must be a REAL English proverb. Meaning field ≥ 4 sentences per language.
 11. Idiom: genuine English idiom. Origin story required (≥ 3 sentences per language).
 12. Phrases: 8 items, each with detailed context ≥ 2–3 sentences per language.
-13. deep_dive: ≥ 250 words per language — an immersive analytical/cultural feature.
-14. closing_reflection: ≥ 200 words per language — a warm, literary synthesis.
+13. deep_dive_title: concise encyclopedic section title (3–7 words). deep_dive: ≥ 250 words per language — authoritative, encyclopedic analysis. NO "lesson/journey" framing.
+14. closing_reflection_title: concise encyclopedic section title. closing_reflection: ≥ 200 words per language — scholarly synthesis. NO "lesson/journey" framing.
 
 CRITICAL — You MUST respond with a single valid JSON object. No markdown, no code fences, no extra text — ONLY the raw JSON.
 
-Use "en" key (not "it") for English content in all Bilingual fields. The JSON structure is identical to the Italian version but with "en" instead of "it" for the foreign language key:
+Use "en" key (not "it") for English content in all Bilingual fields. Do NOT include a "vocabulary" field:
 {
   "topic": {"en": "...", "pl": "..."},
   "subtitle": {"en": "...", "pl": "..."},
@@ -605,19 +692,8 @@ Use "en" key (not "it") for English content in all Bilingual fields. The JSON st
   "key_takeaways": [{"en": "...", "pl": "..."}, {"en": "...", "pl": "..."}, {"en": "...", "pl": "..."}],
   "trivia": {"en": "...", "pl": "..."},
   "regional_notes": {"en": "...", "pl": "..."},
+  "deep_dive_title": {"en": "...", "pl": "..."},
   "deep_dive": {"en": "...", "pl": "..."},
-  "vocabulary": [
-    {
-      "word": "...", "ipa": "...",
-      "part_of_speech": "noun|verb|adjective|adverb|phrase|interjection|conjunction|preposition",
-      "register": "formal|informal|colloquial|literary|regional|vulgar",
-      "translation": "...", "definition": {"en": "...", "pl": "..."},
-      "context_sentence": {"en": "...", "pl": "..."},
-      "audio_hint": "...", "etymology": {"en": "...", "pl": "..."},
-      "synonyms": ["...", "..."], "antonyms": ["...", "..."],
-      "word_family": [{"form": "...", "type": "...", "translation": "..."}]
-    }
-  ],
   "grammar": [
     {
       "title": {"en": "...", "pl": "..."},
@@ -648,7 +724,6 @@ Use "en" key (not "it") for English content in all Bilingual fields. The JSON st
     "text": {"en": "...", "pl": "..."},
     "moral": {"en": "...", "pl": "..."}
   },
-  "closing_reflection": {"en": "...", "pl": "..."},
   "dialogue": {
     "title": {"en": "...", "pl": "..."},
     "setting": {"en": "...", "pl": "..."},
@@ -662,6 +737,8 @@ Use "en" key (not "it") for English content in all Bilingual fields. The JSON st
     ],
     "vocabulary_highlight": ["...", "..."]
   },
+  "closing_reflection_title": {"en": "...", "pl": "..."},
+  "closing_reflection": {"en": "...", "pl": "..."},
   "culture": {
     "title": {"en": "...", "pl": "..."},
     "content": {"en": "...", "pl": "..."},
@@ -700,12 +777,98 @@ Remember: this resource must be so good that a learner could use it as their pri
 
   const data = JSON.parse(text);
 
+  // Generate vocabulary as a separate request with full lesson context
+  const vocabulary = await generateEnglishVocabulary(data, apiKey, model || getSavedModel() || DEFAULT_MODEL, client);
+
   return {
     ...data,
+    vocabulary,
     id: typeof crypto !== "undefined" && crypto.randomUUID
       ? crypto.randomUUID()
       : `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
     timestamp: Date.now(),
     targetLang: 'en' as const,
   };
+};
+
+// ─── English Vocabulary Generation ────────────────────────────────────────────
+
+async function generateEnglishVocabulary(
+  lessonData: Record<string, unknown>,
+  apiKey: string,
+  model: string,
+  client?: OpenAI
+): Promise<import('../types').VocabularyItem[]> {
+  const c = client ?? new OpenAI({ baseURL: "https://openrouter.ai/api/v1", apiKey, dangerouslyAllowBrowser: true });
+
+  const lessonSummary = JSON.stringify({
+    topic: lessonData.topic,
+    tags: lessonData.tags,
+    difficulty_level: lessonData.difficulty_level,
+    introduction: lessonData.introduction,
+    deep_dive: lessonData.deep_dive,
+    grammar: lessonData.grammar,
+    mini_story: lessonData.mini_story,
+    dialogue: lessonData.dialogue,
+  });
+
+  const response = await c.chat.completions.create({
+    model,
+    messages: [
+      {
+        role: "system",
+        content: `You are a specialist English lexicographer and vocabulary teacher for Polish speakers. You create precise, detailed, encyclopedic vocabulary entries for language learners. Your entries are accurate, pedagogically rich, and directly relevant to the topic at hand.`,
+      },
+      {
+        role: "user",
+        content: `Based on the following English lesson content, generate a vocabulary list of EXACTLY 15 to 25 items (no fewer than 15, no more than 25). Choose the most important, topic-relevant English words and phrases — a mix of nouns, verbs, adjectives, adverbs, and set phrases. Prioritise words that actually appear or are strongly implied in the lesson text.
+
+LESSON CONTENT:
+${lessonSummary}
+
+For each vocabulary item provide:
+- word: the English word/phrase
+- ipa: full IPA phonetic transcription
+- part_of_speech: one of noun|verb|adjective|adverb|phrase|interjection|conjunction|preposition
+- register: one of formal|informal|colloquial|literary|regional|vulgar
+- translation: Polish translation (primary meaning, with nuances noted)
+- definition: {"en": "2–3 sentence definition in English explaining usage and nuances", "pl": "2–3 sentence definition in Polish"}
+- context_sentence: {"en": "A vivid, culturally specific English example sentence", "pl": "Polish translation of the sentence"}
+- audio_hint: pronunciation tip for Polish speakers
+- etymology: {"en": "2+ sentence etymology in English", "pl": "2+ sentence etymology in Polish"}
+- synonyms: array of 3–4 English synonyms with register notes
+- antonyms: array of 2–3 English antonyms (if applicable)
+- word_family: array of 3–4 related forms: [{"form": "...", "type": "noun/verb/adj", "translation": "Polish gloss"}]
+
+CRITICAL: Respond with ONLY a raw JSON object in this exact format:
+{
+  "vocabulary": [
+    {
+      "word": "...", "ipa": "...",
+      "part_of_speech": "noun|verb|...",
+      "register": "formal|informal|...",
+      "translation": "...",
+      "definition": {"en": "...", "pl": "..."},
+      "context_sentence": {"en": "...", "pl": "..."},
+      "audio_hint": "...",
+      "etymology": {"en": "...", "pl": "..."},
+      "synonyms": ["...", "..."],
+      "antonyms": ["...", "..."],
+      "word_family": [{"form": "...", "type": "...", "translation": "..."}]
+    }
+  ]
+}`,
+      },
+    ],
+    response_format: { type: "json_object" },
+  });
+
+  const vocabText = response.choices[0]?.message?.content;
+  if (!vocabText) return [];
+  try {
+    const parsed = JSON.parse(vocabText);
+    return parsed.vocabulary ?? [];
+  } catch {
+    return [];
+  }
 };

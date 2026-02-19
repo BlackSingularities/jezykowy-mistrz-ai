@@ -283,7 +283,7 @@ const ApiKeySetup: React.FC<{ onSave: (key: string) => void }> = ({ onSave }) =>
             <div className="w-3 h-3 rounded-full border" style={{ borderColor: 'var(--c-border)' }} />
             <div className="w-3 h-3 rounded-full" style={{ background: 'var(--c-red)' }} />
           </div>
-          <h1 className="text-2xl font-serif font-bold" style={{ color: 'var(--c-text)' }}>Włoski Mistrz AI</h1>
+          <h1 className="text-2xl font-serif font-bold" style={{ color: 'var(--c-text)' }}>Językowy Mistrz AI</h1>
           <p className="text-sm leading-relaxed" style={{ color: 'var(--c-muted)' }}>
             Podaj klucz API OpenRouter. Dane pozostają wyłącznie w Twojej przeglądarce.
           </p>
@@ -703,7 +703,7 @@ const AppInner: React.FC<{ apiKey: string; onChangeKey: () => void; onBackToHome
   const isIt = targetLang === 'it';
   const isEn = targetLang === 'en';
   const L = {
-    appName:      l === 'pl' ? (isIt ? 'Włoski Mistrz AI' : 'Angielski Mistrz AI') : isEn ? 'English Master AI' : 'Maestro Italiano AI',
+    appName:      l === 'pl' ? 'Językowy Mistrz AI' : isEn ? 'Language Master AI' : 'Maestro Linguistico AI',
     headline:     l === 'pl' ? 'O czym chcesz dzisiaj poczytać?' : isEn ? 'What do you want to read about today?' : 'Di cosa vuoi leggere oggi?',
     subtitle:     l === 'pl' ? 'Twórz artykuły, lekcje i opracowania kulturowe z AI.' : isEn ? 'Create articles, lessons and cultural insights with AI.' : "Crea articoli, lezioni e approfondimenti culturali con l'AI.",
     placeholder:  l === 'pl' ? 'Temat… (kilka linii = kilka artykułów równolegle)' : isEn ? 'Topic… (multiple lines = parallel articles)' : 'Argomento… (più righe = più articoli in parallelo)',
@@ -1113,7 +1113,7 @@ const HomeScreen: React.FC<{ onSelect: (lang: TargetLang) => void }> = ({ onSele
           <div className="w-3 h-3 rounded-full" style={{ background: 'var(--c-red)' }} />
         </div>
         <h1 className="text-4xl md:text-5xl font-serif font-bold tracking-tight">
-          <span className="hero-gradient">Mistrz AI</span>
+          <span className="hero-gradient">Językowy Mistrz AI</span>
         </h1>
         <p className="text-sm" style={{ color: 'var(--c-muted)' }}>
           Wybierz język, którego chcesz się uczyć
@@ -1121,6 +1121,21 @@ const HomeScreen: React.FC<{ onSelect: (lang: TargetLang) => void }> = ({ onSele
       </div>
 
       <div className="flex flex-col sm:flex-row gap-5 w-full max-w-md">
+        {/* Angielski — sortowane alfabetycznie */}
+        <button
+          onClick={() => onSelect('en')}
+          className="flex-1 group card card-hover p-8 flex flex-col items-center gap-4 transition-all"
+        >
+          <Flag code="en" size={56} />
+          <div className="text-center">
+            <p className="font-serif font-bold text-xl" style={{ color: 'var(--c-text)' }}>Angielski</p>
+            <p className="text-xs mt-1" style={{ color: 'var(--c-muted)' }}>Polsko-angielski</p>
+          </div>
+          <span className="text-xs font-semibold group-hover:translate-x-1 transition-transform" style={{ color: 'var(--c-green)' }}>
+            Wybierz →
+          </span>
+        </button>
+
         {/* Włoski */}
         <button
           onClick={() => onSelect('it')}
@@ -1130,21 +1145,6 @@ const HomeScreen: React.FC<{ onSelect: (lang: TargetLang) => void }> = ({ onSele
           <div className="text-center">
             <p className="font-serif font-bold text-xl" style={{ color: 'var(--c-text)' }}>Włoski</p>
             <p className="text-xs mt-1" style={{ color: 'var(--c-muted)' }}>Polsko-włoski</p>
-          </div>
-          <span className="text-xs font-semibold group-hover:translate-x-1 transition-transform" style={{ color: 'var(--c-green)' }}>
-            Wybierz →
-          </span>
-        </button>
-
-        {/* Angielski */}
-        <button
-          onClick={() => onSelect('en')}
-          className="flex-1 group card card-hover p-8 flex flex-col items-center gap-4 transition-all"
-        >
-          <Flag code="en" size={56} />
-          <div className="text-center">
-            <p className="font-serif font-bold text-xl" style={{ color: 'var(--c-text)' }}>Angielski</p>
-            <p className="text-xs mt-1" style={{ color: 'var(--c-muted)' }}>Polsko-angielski</p>
           </div>
           <span className="text-xs font-semibold group-hover:translate-x-1 transition-transform" style={{ color: 'var(--c-green)' }}>
             Wybierz →
