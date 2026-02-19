@@ -587,10 +587,12 @@ const VocabCard: React.FC<{
   return (
     <div className="card card-hover overflow-hidden">
       <div className="p-4">
+        {/* ── Word header row ── */}
         <div className="flex items-start justify-between gap-2 mb-2">
           <div className="flex-1 min-w-0">
-            <div className="flex flex-wrap items-center gap-1 mb-0.5">
-              <span className="text-lg font-bold font-serif" style={{ color: 'var(--c-text)' }}>
+            {/* Word + gender + register badges */}
+            <div className="flex flex-wrap items-center gap-1 mb-1">
+              <span className="text-xl font-bold font-serif" style={{ color: 'var(--c-text)' }}>
                 {item.word}
               </span>
               {gs && (
@@ -607,25 +609,44 @@ const VocabCard: React.FC<{
                 {posLabel}
               </Badge>
             </div>
-            <div className="flex flex-wrap items-center gap-1.5">
+
+            {/* IPA + plural */}
+            <div className="flex flex-wrap items-center gap-1.5 mb-1">
               {item.ipa && (
                 <span className="text-xs font-mono px-1.5 py-0.5 rounded"
                   style={{ background: 'var(--c-bg)', color: 'var(--c-faint)', border: '1px solid var(--c-border)' }}>
                   {item.ipa}
                 </span>
               )}
-              <span className="text-xs italic" style={{ color: 'var(--c-muted)' }}>{item.translation}</span>
+              {item.plural && (
+                <span className="text-xs" style={{ color: 'var(--c-faint)' }}>
+                  {LL.pluralLbl} <span className="font-medium" style={{ color: 'var(--c-muted)' }}>{item.plural}</span>
+                </span>
+              )}
             </div>
-            {item.plural && (
-              <div className="mt-0.5 text-xs" style={{ color: 'var(--c-faint)' }}>
-                {LL.pluralLbl} <span className="font-medium" style={{ color: 'var(--c-muted)' }}>{item.plural}</span>
-              </div>
-            )}
+
+            {/* Translations: PL + EN */}
+            <div className="flex flex-wrap gap-1.5 mb-1">
+              <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full"
+                style={{ background: '#f0fdf4', color: '#166534', border: '1px solid #bbf7d0' }}>
+                🇵🇱 {item.translation}
+              </span>
+              {item.english_translation && (
+                <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full"
+                  style={{ background: '#eff6ff', color: '#1e40af', border: '1px solid #bfdbfe' }}>
+                  🇬🇧 {item.english_translation}
+                </span>
+              )}
+            </div>
+
+            {/* Audio hint */}
             {item.audio_hint && (
-              <div className="mt-0.5 text-xs font-mono" style={{ color: '#6366f1' }}>▸ {item.audio_hint}</div>
+              <div className="text-xs font-mono" style={{ color: '#6366f1' }}>▸ {item.audio_hint}</div>
             )}
           </div>
-          <div className="flex items-center gap-1 shrink-0">
+
+          {/* Action buttons */}
+          <div className="flex flex-col items-center gap-1 shrink-0">
             <SpeakBtn
               italianText={item.word}
               id={cardId + '-word'}
@@ -644,18 +665,19 @@ const VocabCard: React.FC<{
           </div>
         </div>
 
-        <p className="text-sm leading-relaxed text-justify-block" style={{ color: 'var(--c-muted)' }}>
+        {/* ── Definition ── */}
+        <p className="text-sm leading-relaxed text-justify-block mb-2" style={{ color: 'var(--c-muted)' }}>
           <B content={item.definition} />
         </p>
 
-        <div className="mt-2 p-3 rounded-lg" style={{ background: 'var(--c-bg)'}}>
-          <p className="text-xs italic" style={{ color: 'var(--c-text)' }}>"<B content={item.context_sentence} />"</p>
+        {/* ── Context sentence ── */}
+        <div className="p-3 rounded-lg" style={{ background: 'var(--c-bg)', border: '1px solid var(--c-border-soft)' }}>
+          <p className="text-xs italic mb-1" style={{ color: 'var(--c-text)' }}>"<B content={item.context_sentence} />"</p>
           <SpeakBtn
             italianText={(isEn ? item.context_sentence.en : item.context_sentence.it) ?? item.context_sentence.pl ?? ''}
             id={cardId + '-sentence'}
             speak={speak} stop={stop} speakId={speakId}
             label={LL.listenSent}
-            className="mt-1"
           />
         </div>
       </div>
@@ -1109,7 +1131,9 @@ export const LessonView: React.FC<LessonViewProps> = ({ lesson, onBack, onChange
                     style={{ background: 'var(--c-bg)', borderColor: 'var(--c-border)' }}>
                     <BookOpenIcon className="w-4 h-4 shrink-0" style={{ color: 'var(--c-green)' }} />
                     <h2 className="text-base font-serif font-bold" style={{ color: 'var(--c-text)' }}>
-                      {t3('Pogłębiona analiza', 'Approfondimento', 'Deep Dive')}
+                      {lesson.deep_dive_title
+                        ? <B content={lesson.deep_dive_title} />
+                        : t3('Analiza', 'Analisi', 'Analysis')}
                     </h2>
                   </div>
                   <div className="p-6 space-y-3">
@@ -1289,16 +1313,14 @@ export const LessonView: React.FC<LessonViewProps> = ({ lesson, onBack, onChange
                 <SectionHeading
                   id="story"
                   icon={BookmarkIcon}
-                  title={t3('Krótkie opowiadanie', 'Breve Racconto', 'Short Story')}
-                  subtitle={t3('Słownictwo w kontekście narracyjnym', 'Lessico nel contesto narrativo', 'Vocabulary in narrative context')}
+                  title={lesson.mini_story.title
+                    ? (l === 'pl' ? lesson.mini_story.title.pl : tl(lesson.mini_story.title))
+                    : t3('Opowiadanie', 'Racconto', 'Story')}
                 />
                 <div className="card overflow-hidden relative">
                   <div className="absolute top-4 left-4 text-7xl font-serif leading-none select-none pointer-events-none"
                     style={{ color: 'var(--c-border-soft)' }}>"</div>
                   <div className="relative p-6 md:p-8">
-                    <h3 className="text-lg font-serif font-bold mb-4" style={{ color: 'var(--c-text)' }}>
-                      <B content={lesson.mini_story.title} />
-                    </h3>
                     <div className="prose prose-slate max-w-none text-base font-light leading-relaxed text-justify-block" style={{ color: 'var(--c-muted)' }}>
                       <B content={lesson.mini_story.text} as="p" />
                     </div>
@@ -1334,7 +1356,9 @@ export const LessonView: React.FC<LessonViewProps> = ({ lesson, onBack, onChange
                     <div className="flex items-center gap-2 mb-1">
                       <SparklesIcon className="w-4 h-4 shrink-0" style={{ color: 'var(--c-green)' }} />
                       <h2 className="text-base font-serif font-bold" style={{ color: 'var(--c-text)' }}>
-                        {t3('Refleksja końcowa', 'Riflessione finale', 'Closing Reflection')}
+                        {lesson.closing_reflection_title
+                          ? <B content={lesson.closing_reflection_title} />
+                          : t3('Synteza', 'Sintesi', 'Synthesis')}
                       </h2>
                     </div>
                     <p className="text-sm leading-relaxed text-justify-block font-light" style={{ color: 'var(--c-muted)' }}>
@@ -1344,7 +1368,7 @@ export const LessonView: React.FC<LessonViewProps> = ({ lesson, onBack, onChange
                       italianText={tl(lesson.closing_reflection)}
                       id="closing-reflection-text"
                       speak={speak} stop={stop} speakId={speakId}
-                      label={t3('Odsłuchaj refleksję', 'Ascolta riflessione', 'Listen to reflection')}
+                      label={t3('Odsłuchaj', 'Ascolta', 'Listen')}
                     />
                   </div>
                 </div>
