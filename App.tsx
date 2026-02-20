@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, FormEvent } from 'react';
 import { createRoot } from 'react-dom/client';
-import { loadModels, getSavedModel, saveModel, ORModel } from './services/geminiService';
+import { loadModels, getSavedModel, saveModel, ORModel, generateSpanishLesson } from './services/geminiService';
 import { LessonView, getFavorites, toggleFavorite } from './components/LessonView';
 import { LangProvider, useLang, useTheme, useFontSize } from './context/LangContext';
 import { Flag, LangFlag } from './components/Flag';
@@ -30,7 +30,7 @@ interface QueueItem {
   qid: string;       // unique queue id
   topic: string;
   status: QueueStatus;
-  targetLang?: 'it' | 'en' | 'fr';
+  targetLang?: 'it' | 'en' | 'fr' | 'es';
   lessonId?: string; // set when done
   error?: string;
   startedAt?: number;
@@ -100,12 +100,12 @@ const DIFF_GRADIENT: Record<string, string> = {
   C1: 'from-violet-500 to-purple-700',
 };
 
-const DIFF_LABELS: Record<string, { pl: string; it: string; en: string; fr: string }> = {
-  A1: { pl: 'Początkujący',        it: 'Principiante',    en: 'Beginner',           fr: 'Débutant' },
-  A2: { pl: 'Elementarny',         it: 'Elementare',      en: 'Elementary',         fr: 'Élémentaire' },
-  B1: { pl: 'Średniozaawansowany', it: 'Intermedio',      en: 'Intermediate',       fr: 'Intermédiaire' },
-  B2: { pl: 'Wyższy średni',       it: 'Intermedio sup.', en: 'Upper-Intermediate', fr: 'Interm. supérieur' },
-  C1: { pl: 'Zaawansowany',        it: 'Avanzato',        en: 'Advanced',           fr: 'Avancé' },
+const DIFF_LABELS: Record<string, { pl: string; it: string; en: string; fr: string; es: string }> = {
+  A1: { pl: 'Początkujący',        it: 'Principiante',    en: 'Beginner',           fr: 'Débutant',           es: 'Principiante'    },
+  A2: { pl: 'Elementarny',         it: 'Elementare',      en: 'Elementary',         fr: 'Élémentaire',        es: 'Elemental'       },
+  B1: { pl: 'Średniozaawansowany', it: 'Intermedio',      en: 'Intermediate',       fr: 'Intermédiaire',      es: 'Intermedio'      },
+  B2: { pl: 'Wyższy średni',       it: 'Intermedio sup.', en: 'Upper-Intermediate', fr: 'Interm. supérieur',  es: 'Interm. superior' },
+  C1: { pl: 'Zaawansowany',        it: 'Avanzato',        en: 'Advanced',           fr: 'Avancé',             es: 'Avanzado'        },
 };
 
 // ─── ModelPicker ──────────────────────────────────────────────────────────────
@@ -114,7 +114,7 @@ const ModelPicker: React.FC<{
   apiKey: string;
   activeModel: string;
   onChange: (modelId: string) => void;
-  lang: 'it' | 'pl' | 'en' | 'fr';
+  lang: 'it' | 'pl' | 'en' | 'fr' | 'es';
 }> = ({ apiKey, activeModel, onChange, lang }) => {
   const [open, setOpen] = useState(false);
   const [models, setModels] = useState<ORModel[]>([]);
@@ -143,7 +143,7 @@ const ModelPicker: React.FC<{
       // sortuj: darmowe/popularne najpierw (po nazwie)
       setModels(list.sort((a, b) => a.id.localeCompare(b.id)));
     } catch {
-      setError(lang === 'it' ? 'Impossibile caricare i modelli.' : lang === 'en' ? 'Could not load models.' : lang === 'fr' ? 'Impossible de charger les modèles.' : 'Nie udało się załadować modeli.');
+      setError(lang === 'it' ? 'Impossibile caricare i modelli.' : lang === 'en' ? 'Could not load models.' : lang === 'fr' ? 'Impossible de charger les modèles.' : lang === 'es' ? 'No se pudieron cargar los modelos.' : 'Nie udało się załadować modeli.');
     } finally {
       setLoading(false);
     }
@@ -194,7 +194,7 @@ const ModelPicker: React.FC<{
                 type="text"
                 value={query}
                 onChange={e => setQuery(e.target.value)}
-                placeholder={lang === 'it' ? 'Cerca modello…' : lang === 'en' ? 'Search model…' : lang === 'fr' ? 'Rechercher un modèle…' : 'Szukaj modelu…'}
+                placeholder={lang === 'it' ? 'Cerca modello…' : lang === 'en' ? 'Search model…' : lang === 'fr' ? 'Rechercher un modèle…' : lang === 'es' ? 'Buscar modelo…' : 'Szukaj modelu…'}
                 className="w-full pl-8 pr-3 py-1.5 text-xs rounded-lg outline-none"
                 style={{ background: 'var(--c-bg)', border: '1px solid var(--c-border)', color: 'var(--c-text)' }}
               />
@@ -206,7 +206,7 @@ const ModelPicker: React.FC<{
             {loading && (
               <div className="flex items-center justify-center gap-2 py-6 text-xs" style={{ color: 'var(--c-muted)' }}>
                 <SparklesIcon className="w-3.5 h-3.5 animate-spin" style={{ color: 'var(--c-green)' }} />
-                {lang === 'it' ? 'Caricamento…' : 'Ładowanie…'}
+                {lang === 'it' ? 'Caricamento…' : lang === 'en' ? 'Loading…' : lang === 'fr' ? 'Chargement…' : lang === 'es' ? 'Cargando…' : 'Ładowanie…'}
               </div>
             )}
             {error && (
@@ -214,7 +214,7 @@ const ModelPicker: React.FC<{
             )}
             {!loading && !error && filtered.length === 0 && (
               <p className="text-xs text-center py-4" style={{ color: 'var(--c-faint)' }}>
-                {lang === 'it' ? 'Nessun risultato.' : lang === 'en' ? 'No results.' : lang === 'fr' ? 'Aucun résultat.' : 'Brak wyników.'}
+                {lang === 'it' ? 'Nessun risultato.' : lang === 'en' ? 'No results.' : lang === 'fr' ? 'Aucun résultat.' : lang === 'es' ? 'Sin resultados.' : 'Brak wyników.'}
               </p>
             )}
             {!loading && filtered.map(m => {
@@ -328,7 +328,7 @@ const ApiKeySetup: React.FC<{ onSave: (key: string) => void }> = ({ onSave }) =>
 
 const LessonCard: React.FC<{
   lesson: Lesson;
-  lang: 'it' | 'pl' | 'en';
+  lang: 'it' | 'pl' | 'en' | 'fr' | 'es';
   onOpen: () => void;
   onDelete: (e: React.MouseEvent) => void;
   isFav: boolean;
@@ -337,9 +337,9 @@ const LessonCard: React.FC<{
   const tl = lesson.targetLang ?? 'it';
   const gradient = DIFF_GRADIENT[lesson.difficulty_level] ?? DIFF_GRADIENT.B1;
   const diffLabels = DIFF_LABELS[lesson.difficulty_level];
-  const diffLabel = diffLabels ? diffLabels[lang === 'pl' ? 'pl' : tl] : lesson.difficulty_level;
-  const getTlText = (b?: { it?: string; en?: string; fr?: string; pl: string }) =>
-    b ? (tl === 'en' ? b.en : tl === 'fr' ? b.fr : b.it) ?? b.pl : '';
+  const diffLabel = diffLabels ? diffLabels[lang === 'pl' ? 'pl' : (tl in diffLabels ? tl as keyof typeof diffLabels : 'it')] : lesson.difficulty_level;
+  const getTlText = (b?: { it?: string; en?: string; fr?: string; es?: string; pl: string }) =>
+    b ? (tl === 'en' ? b.en : tl === 'fr' ? b.fr : tl === 'es' ? b.es : b.it) ?? b.pl : '';
   const topicText = lang === 'pl' ? lesson.topic.pl : getTlText(lesson.topic);
   const subtitleText = lesson.subtitle ? (lang === 'pl' ? lesson.subtitle.pl : getTlText(lesson.subtitle)) : null;
   const introText = lang === 'pl' ? lesson.introduction?.pl : getTlText(lesson.introduction);
@@ -406,7 +406,7 @@ const LessonCard: React.FC<{
         )}
         {lesson.vocabulary?.length > 0 && (
           <div>
-            <p className="micro-label mb-1">{lang === 'pl' ? 'Kluczowe słowa' : lang === 'en' ? 'Key words' : lang === 'fr' ? 'Mots clés' : 'Parole chiave'}</p>
+            <p className="micro-label mb-1">{lang === 'pl' ? 'Kluczowe słowa' : lang === 'en' ? 'Key words' : lang === 'fr' ? 'Mots clés' : lang === 'es' ? 'Palabras clave' : 'Parole chiave'}</p>
             <div className="flex flex-wrap gap-1">
               {lesson.vocabulary.slice(0, 3).map((v, i) => (
                 <span key={i} className="inline-flex items-center gap-1 text-xs rounded px-2 py-0.5 font-medium"
@@ -436,7 +436,7 @@ const LessonCard: React.FC<{
           )}
         </div>
         <span className="font-semibold group-hover:translate-x-1 transition-transform" style={{ color: 'var(--c-green)' }}>
-          {lang === 'pl' ? 'Czytaj →' : lang === 'en' ? 'Read →' : lang === 'fr' ? 'Lire →' : 'Leggi →'}
+          {lang === 'pl' ? 'Czytaj →' : lang === 'en' ? 'Read →' : lang === 'fr' ? 'Lire →' : lang === 'es' ? 'Leer →' : 'Leggi →'}
         </span>
       </div>
     </article>
@@ -454,7 +454,7 @@ const ChangeKeyModal: React.FC<{ onClose: () => void; onSave: (key: string) => v
     e.preventDefault();
     const trimmed = value.trim();
     if (!trimmed.startsWith('sk-or-')) {
-      setError(l === 'pl' ? 'Klucz powinien zaczynać się od "sk-or-".' : l === 'en' ? 'Key must start with "sk-or-".' : l === 'fr' ? 'La clé doit commencer par "sk-or-".' : 'La chiave deve iniziare con "sk-or-".');
+      setError(l === 'pl' ? 'Klucz powinien zaczynać się od "sk-or-".' : l === 'en' ? 'Key must start with "sk-or-".' : l === 'fr' ? 'La clé doit commencer par "sk-or-".' : l === 'es' ? 'La clave debe comenzar con "sk-or-".' : 'La chiave deve iniziare con "sk-or-".');
       return;
     }
     onSave(trimmed);
@@ -471,10 +471,10 @@ const ChangeKeyModal: React.FC<{ onClose: () => void; onSave: (key: string) => v
         </button>
         <div>
           <h2 className="font-serif font-bold text-base" style={{ color: 'var(--c-text)' }}>
-            {l === 'pl' ? 'Zmień klucz API' : l === 'en' ? 'Change API Key' : l === 'fr' ? 'Changer la clé API' : 'Cambia chiave API'}
+            {l === 'pl' ? 'Zmień klucz API' : l === 'en' ? 'Change API Key' : l === 'fr' ? 'Changer la clé API' : l === 'es' ? 'Cambiar clave API' : 'Cambia chiave API'}
           </h2>
           <p className="text-xs mt-0.5" style={{ color: 'var(--c-muted)' }}>
-            {l === 'pl' ? 'Podaj nowy klucz OpenRouter.' : l === 'en' ? 'Enter a new OpenRouter key.' : l === 'fr' ? 'Entrez une nouvelle clé OpenRouter.' : 'Inserisci una nuova chiave OpenRouter.'}
+            {l === 'pl' ? 'Podaj nowy klucz OpenRouter.' : l === 'en' ? 'Enter a new OpenRouter key.' : l === 'fr' ? 'Entrez une nouvelle clé OpenRouter.' : l === 'es' ? 'Introduce una nueva clave OpenRouter.' : 'Inserisci una nuova chiave OpenRouter.'}
           </p>
         </div>
         <form onSubmit={handleSubmit} className="space-y-3">
@@ -494,7 +494,7 @@ const ChangeKeyModal: React.FC<{ onClose: () => void; onSave: (key: string) => v
             className="w-full py-2 rounded-lg font-semibold text-sm transition-colors disabled:opacity-40"
             style={{ background: 'var(--c-text)', color: '#fff' }}
           >
-            {l === 'pl' ? 'Zapisz' : l === 'en' ? 'Save' : l === 'fr' ? 'Enregistrer' : 'Salva'}
+            {l === 'pl' ? 'Zapisz' : l === 'en' ? 'Save' : l === 'fr' ? 'Enregistrer' : l === 'es' ? 'Guardar' : 'Salva'}
           </button>
         </form>
       </div>
@@ -515,6 +515,7 @@ const AppInner: React.FC<{
   const { globalLang, toggleGlobal, targetLang } = useLang();
   const { theme, toggleTheme } = useTheme();
   const { fontSizeIndex, increaseFontSize, decreaseFontSize } = useFontSize();
+  const isEs = targetLang === 'es';
 
   const [input, setInput] = useState('');
   const [history, setHistory] = useState<Lesson[]>([]);
@@ -562,7 +563,7 @@ const AppInner: React.FC<{
           qid: sj.id,
           topic: sj.topic,
           status: sj.status as QueueStatus,
-          targetLang: sj.targetLang as 'it' | 'en' | 'fr' | undefined,
+          targetLang: sj.targetLang as 'it' | 'en' | 'fr' | 'es' | undefined,
           lessonId: sj.lessonId,
           error: sj.error,
           startedAt: sj.createdAt,
@@ -729,7 +730,7 @@ const AppInner: React.FC<{
       if (!lesson) return;
 
       // Switch to the lesson's language if it differs from current
-      const lessonLang = (lesson.targetLang ?? job.targetLang ?? 'it') as TargetLang;
+      const lessonLang = (lesson.targetLang ?? job.targetLang ?? 'it') as TargetLang; // 'it' | 'en' | 'fr' | 'es'
       if (lessonLang !== targetLang) {
         onChangeLang(lessonLang);
       }
@@ -755,6 +756,7 @@ const AppInner: React.FC<{
           (lesson.topic.it ?? '').toLowerCase().includes(q) ||
           (lesson.topic.en ?? '').toLowerCase().includes(q) ||
           (lesson.topic.fr ?? '').toLowerCase().includes(q) ||
+          (lesson.topic.es ?? '').toLowerCase().includes(q) ||
           lesson.tags?.some(t => t.toLowerCase().includes(q))
         );
       }
@@ -779,19 +781,19 @@ const AppInner: React.FC<{
   const isEn = targetLang === 'en';
   const isFr = targetLang === 'fr';
   const L = {
-    appName:      l === 'pl' ? 'Językowy Mistrz AI' : isEn ? 'Language Master AI' : isFr ? 'Maître Linguistique IA' : 'Maestro Linguistico AI',
-    headline:     l === 'pl' ? 'O czym chcesz dzisiaj poczytać?' : isEn ? 'What do you want to read about today?' : isFr ? "De quoi voulez-vous lire aujourd'hui ?" : 'Di cosa vuoi leggere oggi?',
-    subtitle:     l === 'pl' ? 'Twórz artykuły, lekcje i opracowania kulturowe z AI.' : isEn ? 'Create articles, lessons and cultural insights with AI.' : isFr ? "Créez des articles, des leçons et des analyses culturelles avec l'IA." : "Crea articoli, lezioni e approfondimenti culturali con l'AI.",
-    placeholder:  l === 'pl' ? 'Temat… (kilka linii = kilka artykułów równolegle)' : isEn ? 'Topic… (multiple lines = parallel articles)' : isFr ? 'Sujet… (plusieurs lignes = plusieurs articles en parallèle)' : 'Argomento… (più righe = più articoli in parallelo)',
-    generating:   l === 'pl' ? 'Generowanie — to może chwilę zająć…' : isEn ? 'Generating — this may take a moment…' : isFr ? 'Génération en cours…' : 'Generazione in corso…',
-    yourArticles: l === 'pl' ? 'Twoje artykuły' : isEn ? 'Your articles' : isFr ? 'Vos articles' : 'I tuoi articoli',
-    search:       l === 'pl' ? 'Szukaj…' : isEn ? 'Search…' : isFr ? 'Rechercher…' : 'Cerca…',
-    noArticles:   l === 'pl' ? 'Brak artykułów. Stwórz swój pierwszy!' : isEn ? 'No articles yet. Create your first!' : isFr ? 'Pas encore d\'articles. Créez le vôtre !' : 'Nessun articolo. Crea il tuo primo!',
-    noArticlesSub:l === 'pl' ? (isIt ? 'Np. "Pizza", "Rzym" lub "Wenecja"' : isFr ? 'Np. "Cuisine", "Paris" lub "Culture française"' : 'Np. "greetings", "food" lub "British culture"') : isEn ? 'E.g. "Greetings", "Food" or "British culture"' : isFr ? 'Ex. "Cuisine", "Paris" ou "Culture française"' : 'Es. "Pizza", "Roma" o "Venezia"',
-    noResults:    (q: string) => l === 'pl' ? `Brak wyników dla "${q}"` : isEn ? `No results for "${q}"` : isFr ? `Aucun résultat pour "${q}"` : `Nessun risultato per "${q}"`,
-    langToggle:   l === 'pl' ? 'Zmień język' : isEn ? 'Change language' : isFr ? 'Changer de langue' : 'Cambia lingua',
-    apiKey:       l === 'pl' ? 'Zmień klucz API' : isEn ? 'Change API key' : isFr ? 'Changer la clé API' : 'Cambia chiave API',
-    backToHome:   l === 'pl' ? 'Zmień tryb' : isEn ? 'Change mode' : isFr ? 'Changer de mode' : 'Cambia modalità',
+    appName:      l === 'pl' ? 'Językowy Mistrz AI' : isEn ? 'Language Master AI' : isFr ? 'Maître Linguistique IA' : isEs ? 'Maestro de Idiomas IA' : 'Maestro Linguistico AI',
+    headline:     l === 'pl' ? 'O czym chcesz dzisiaj poczytać?' : isEn ? 'What do you want to read about today?' : isFr ? "De quoi voulez-vous lire aujourd'hui ?" : isEs ? '¿Sobre qué quieres leer hoy?' : 'Di cosa vuoi leggere oggi?',
+    subtitle:     l === 'pl' ? 'Twórz artykuły, lekcje i opracowania kulturowe z AI.' : isEn ? 'Create articles, lessons and cultural insights with AI.' : isFr ? "Créez des articles, des leçons et des analyses culturelles avec l'IA." : isEs ? 'Crea artículos, lecciones y análisis culturales con IA.' : "Crea articoli, lezioni e approfondimenti culturali con l'AI.",
+    placeholder:  l === 'pl' ? 'Temat… (kilka linii = kilka artykułów równolegle)' : isEn ? 'Topic… (multiple lines = parallel articles)' : isFr ? 'Sujet… (plusieurs lignes = plusieurs articles en parallèle)' : isEs ? 'Tema… (varias líneas = varios artículos en paralelo)' : 'Argomento… (più righe = più articoli in parallelo)',
+    generating:   l === 'pl' ? 'Generowanie — to może chwilę zająć…' : isEn ? 'Generating — this may take a moment…' : isFr ? 'Génération en cours…' : isEs ? 'Generando…' : 'Generazione in corso…',
+    yourArticles: l === 'pl' ? 'Twoje artykuły' : isEn ? 'Your articles' : isFr ? 'Vos articles' : isEs ? 'Tus artículos' : 'I tuoi articoli',
+    search:       l === 'pl' ? 'Szukaj…' : isEn ? 'Search…' : isFr ? 'Rechercher…' : isEs ? 'Buscar…' : 'Cerca…',
+    noArticles:   l === 'pl' ? 'Brak artykułów. Stwórz swój pierwszy!' : isEn ? 'No articles yet. Create your first!' : isFr ? 'Pas encore d\'articles. Créez le vôtre !' : isEs ? '¡Sin artículos. ¡Crea el primero!' : 'Nessun articolo. Crea il tuo primo!',
+    noArticlesSub:l === 'pl' ? (isIt ? 'Np. "Pizza", "Rzym" lub "Wenecja"' : isFr ? 'Np. "Cuisine", "Paris" lub "Culture française"' : isEs ? 'Np. "Tapas", "Madrid" lub "Cultura española"' : 'Np. "greetings", "food" lub "British culture"') : isEn ? 'E.g. "Greetings", "Food" or "British culture"' : isFr ? 'Ex. "Cuisine", "Paris" ou "Culture française"' : isEs ? 'Ej. "Tapas", "Madrid" o "Cultura española"' : 'Es. "Pizza", "Roma" o "Venezia"',
+    noResults:    (q: string) => l === 'pl' ? `Brak wyników dla "${q}"` : isEn ? `No results for "${q}"` : isFr ? `Aucun résultat pour "${q}"` : isEs ? `Sin resultados para "${q}"` : `Nessun risultato per "${q}"`,
+    langToggle:   l === 'pl' ? 'Zmień język' : isEn ? 'Change language' : isFr ? 'Changer de langue' : isEs ? 'Cambiar idioma' : 'Cambia lingua',
+    apiKey:       l === 'pl' ? 'Zmień klucz API' : isEn ? 'Change API key' : isFr ? 'Changer la clé API' : isEs ? 'Cambiar clave API' : 'Cambia chiave API',
+    backToHome:   l === 'pl' ? 'Zmień tryb' : isEn ? 'Change mode' : isFr ? 'Changer de mode' : isEs ? 'Cambiar modo' : 'Cambia modalità',
   };
 
   return (
@@ -851,7 +853,7 @@ const AppInner: React.FC<{
               style={{ background: 'var(--c-text)', color: theme === 'dark' ? '#13151b' : '#fff', width: 'auto', padding: '0 10px', gap: 4 }}
             >
               <LanguageIcon className="w-3.5 h-3.5 shrink-0" />
-              <span>{l === 'pl' ? 'PL' : l === 'en' ? 'EN' : l === 'fr' ? 'FR' : 'IT'}</span>
+              <span>{l === 'pl' ? 'PL' : l === 'en' ? 'EN' : l === 'fr' ? 'FR' : l === 'es' ? 'ES' : 'IT'}</span>
               <LangFlag lang={l} size={14} />
             </button>
             {/* Motyw */}
@@ -911,7 +913,7 @@ const AppInner: React.FC<{
                   disabled={!input.trim()}
                   className="absolute right-2 bottom-2 p-2 rounded-lg transition-all active:scale-95 disabled:opacity-40"
                   style={{ background: 'var(--c-text)', color: '#fff' }}
-                  title={l === 'pl' ? 'Dodaj do kolejki (Enter)' : l === 'en' ? 'Add to queue (Enter)' : l === 'fr' ? 'Ajouter à la file (Entrée)' : 'Aggiungi alla coda (Enter)'}
+                  title={l === 'pl' ? 'Dodaj do kolejki (Enter)' : l === 'en' ? 'Add to queue (Enter)' : l === 'fr' ? 'Ajouter à la file (Entrée)' : l === 'es' ? 'Añadir a la cola (Enter)' : 'Aggiungi alla coda (Enter)'}
                 >
                   <PlusIcon className="w-4 h-4" />
                 </button>
@@ -924,10 +926,13 @@ const AppInner: React.FC<{
                     ? `${input.split('\n').filter(t => t.trim()).length} topics — Enter to add all`
                     : l === 'fr'
                     ? `${input.split('\n').filter(t => t.trim()).length} sujets — Entrée pour tout ajouter`
+                    : l === 'es'
+                    ? `${input.split('\n').filter(t => t.trim()).length} temas — Enter para añadir todos`
                     : `${input.split('\n').filter(t => t.trim()).length} argomenti — Enter per aggiungere tutti`)
                   : (l === 'pl' ? 'Enter by dodać · Shift+Enter = nowa linia · kilka linii = równolegle'
                     : l === 'en' ? 'Enter to add · Shift+Enter = new line · multiple lines = parallel'
                     : l === 'fr' ? 'Entrée pour ajouter · Shift+Entrée = nouvelle ligne · plusieurs lignes = parallèle'
+                    : l === 'es' ? 'Enter para añadir · Shift+Enter = nueva línea · varias líneas = paralelo'
                     : 'Enter per aggiungere · Shift+Enter = nuova riga · più righe = parallelo')
                 }
               </p>
@@ -938,17 +943,17 @@ const AppInner: React.FC<{
               <div className="max-w-lg mx-auto w-full space-y-1 animate-fade-in">
                 <div className="flex items-center justify-between px-1 mb-0.5">
                   <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--c-faint)' }}>
-                    {l === 'pl' ? 'Kolejka generowania' : l === 'en' ? 'Generation queue' : l === 'fr' ? 'File de génération' : 'Coda generazione'}
+                    {l === 'pl' ? 'Kolejka generowania' : l === 'en' ? 'Generation queue' : l === 'fr' ? 'File de génération' : l === 'es' ? 'Cola de generación' : 'Coda generazione'}
                     {queue.filter(j => j.status === 'running').length > 0 && (
                       <span className="ml-1 normal-case font-normal">
-                        — {queue.filter(j => j.status === 'running').length} {l === 'pl' ? 'w toku' : l === 'en' ? 'running' : l === 'fr' ? 'en cours' : 'in corso'}
-                        {queue.filter(j => j.status === 'pending').length > 0 && `, ${queue.filter(j => j.status === 'pending').length} ${l === 'pl' ? 'czeka' : l === 'en' ? 'waiting' : l === 'fr' ? 'en attente' : 'in attesa'}`}
+                        — {queue.filter(j => j.status === 'running').length} {l === 'pl' ? 'w toku' : l === 'en' ? 'running' : l === 'fr' ? 'en cours' : l === 'es' ? 'en proceso' : 'in corso'}
+                        {queue.filter(j => j.status === 'pending').length > 0 && `, ${queue.filter(j => j.status === 'pending').length} ${l === 'pl' ? 'czeka' : l === 'en' ? 'waiting' : l === 'fr' ? 'en attente' : l === 'es' ? 'esperando' : 'in attesa'}`}
                       </span>
                     )}
                   </span>
                   {queue.some(j => j.status === 'done' || j.status === 'error') && (
                     <button onClick={clearFinished} className="text-[10px] underline" style={{ color: 'var(--c-faint)' }}>
-                      {l === 'pl' ? 'Wyczyść zakończone' : l === 'en' ? 'Clear finished' : l === 'fr' ? 'Effacer terminés' : 'Pulisci'}
+                      {l === 'pl' ? 'Wyczyść zakończone' : l === 'en' ? 'Clear finished' : l === 'fr' ? 'Effacer terminés' : l === 'es' ? 'Limpiar terminados' : 'Pulisci'}
                     </button>
                   )}
                 </div>
@@ -974,14 +979,14 @@ const AppInner: React.FC<{
                     {/* Status icon */}
                     <span className="shrink-0">
                       {job.status === 'running' && <SparklesIcon className="w-3.5 h-3.5 animate-spin" style={{ color: 'var(--c-green)' }} />}
-                      {job.status === 'pending' && <ClockIcon className="w-3.5 h-3.5" style={{ color: 'var(--c-faint)' }} />}
+                      {job.status === 'pending' && <ArrowPathIcon className="w-3.5 h-3.5 animate-pulse" style={{ color: 'var(--c-faint)' }} />}
                       {job.status === 'done'    && <CheckCircleIcon className="w-3.5 h-3.5" style={{ color: 'var(--c-green)' }} />}
                       {job.status === 'error'   && <ExclamationCircleIcon className="w-3.5 h-3.5" style={{ color: 'var(--c-red)' }} />}
                     </span>
 
                     {/* Language flag */}
                     {job.targetLang && (
-                      <span className="shrink-0 opacity-70" title={job.targetLang === 'it' ? 'Włoski' : job.targetLang === 'en' ? 'Angielski' : 'Francuski'}>
+                      <span className="shrink-0 opacity-70" title={job.targetLang === 'it' ? 'Włoski' : job.targetLang === 'en' ? 'Angielski' : job.targetLang === 'fr' ? 'Francuski' : job.targetLang === 'es' ? 'Hiszpański' : ''}>
                         <Flag code={job.targetLang} size={12} />
                       </span>
                     )}
@@ -1003,8 +1008,8 @@ const AppInner: React.FC<{
                         : job.status === 'running' ? 'var(--c-green)'
                         : 'var(--c-faint)'
                     }}>
-                      {job.status === 'running' && (l === 'pl' ? 'Generuję…' : l === 'en' ? 'Generating…' : l === 'fr' ? 'Génération…' : 'Generando…')}
-                      {job.status === 'pending' && (l === 'pl' ? 'W kolejce' : l === 'en' ? 'Queued' : l === 'fr' ? 'En attente' : 'In attesa')}
+                      {job.status === 'running' && (l === 'pl' ? 'Generuję…' : l === 'en' ? 'Generating…' : l === 'fr' ? 'Génération…' : l === 'es' ? 'Generando…' : 'Generando…')}
+                      {job.status === 'pending' && (l === 'pl' ? 'W kolejce' : l === 'en' ? 'Queued' : l === 'fr' ? 'En attente' : l === 'es' ? 'En cola' : 'In attesa')}
                       {job.status === 'done' && (
                         <button
                           onClick={() => openQueueLesson(job)}
@@ -1013,8 +1018,8 @@ const AppInner: React.FC<{
                           style={{ color: 'var(--c-green)' }}
                         >
                           {openingLessonId === job.lessonId
-                            ? (l === 'pl' ? 'Ładuję…' : l === 'en' ? 'Loading…' : l === 'fr' ? 'Chargement…' : 'Carico…')
-                            : (l === 'pl' ? 'Otwórz →' : l === 'en' ? 'Open →' : l === 'fr' ? 'Ouvrir →' : 'Apri →')}
+                            ? (l === 'pl' ? 'Ładuję…' : l === 'en' ? 'Loading…' : l === 'fr' ? 'Chargement…' : l === 'es' ? 'Cargando…' : 'Carico…')
+                            : (l === 'pl' ? 'Otwórz →' : l === 'en' ? 'Open →' : l === 'fr' ? 'Ouvrir →' : l === 'es' ? 'Abrir →' : 'Apri →')}
                         </button>
                       )}
                       {job.status === 'error' && (
@@ -1022,10 +1027,10 @@ const AppInner: React.FC<{
                           onClick={() => retryQueueItem(job.qid)}
                           className="flex items-center gap-0.5 font-bold underline"
                           style={{ color: 'var(--c-red)' }}
-                          title={l === 'pl' ? 'Ponów próbę' : l === 'en' ? 'Retry' : l === 'fr' ? 'Réessayer' : 'Riprova'}
+                          title={l === 'pl' ? 'Ponów próbę' : l === 'en' ? 'Retry' : l === 'fr' ? 'Réessayer' : l === 'es' ? 'Reintentar' : 'Riprova'}
                         >
                           <ArrowPathIcon className="w-3 h-3" />
-                          {l === 'pl' ? 'Ponów' : l === 'en' ? 'Retry' : l === 'fr' ? 'Réessayer' : 'Riprova'}
+                          {l === 'pl' ? 'Ponów' : l === 'en' ? 'Retry' : l === 'fr' ? 'Réessayer' : l === 'es' ? 'Reintentar' : 'Riprova'}
                         </button>
                       )}
                     </span>
@@ -1062,10 +1067,10 @@ const AppInner: React.FC<{
                     onClick={() => { const r = filteredHistory[Math.floor(Math.random() * filteredHistory.length)]; setActiveLesson(r); }}
                     className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold border transition-all"
                     style={{ background: 'var(--c-bg)', border: '1px solid var(--c-border)', color: 'var(--c-muted)' }}
-                    title={(l === 'pl' ? 'Losowa lekcja' : l === 'en' ? 'Random article' : l === 'fr' ? 'Article aléatoire' : 'Articolo casuale') + ' [R]'}
+                    title={(l === 'pl' ? 'Losowa lekcja' : l === 'en' ? 'Random article' : l === 'fr' ? 'Article aléatoire' : l === 'es' ? 'Artículo aleatorio' : 'Articolo casuale') + ' [R]'}
                   >
                     <ArrowPathIcon className="w-3 h-3" />
-                    {l === 'pl' ? 'Losowa' : l === 'en' ? 'Random' : l === 'fr' ? 'Aléatoire' : 'Casuale'}
+                    {l === 'pl' ? 'Losowa' : l === 'en' ? 'Random' : l === 'fr' ? 'Aléatoire' : l === 'es' ? 'Aleatorio' : 'Casuale'}
                   </button>
                 )}
                 {/* Favorites filter */}
@@ -1077,10 +1082,10 @@ const AppInner: React.FC<{
                       ? { background: 'rgba(245,158,11,.12)', color: '#d97706', border: '1px solid rgba(245,158,11,.35)' }
                       : { background: 'var(--c-bg)', border: '1px solid var(--c-border)', color: 'var(--c-muted)' }
                     }
-                    title={l === 'pl' ? 'Tylko ulubione' : l === 'en' ? 'Favourites only' : l === 'fr' ? 'Favoris seulement' : 'Solo preferiti'}
+                    title={l === 'pl' ? 'Tylko ulubione' : l === 'en' ? 'Favourites only' : l === 'fr' ? 'Favoris seulement' : l === 'es' ? 'Solo favoritos' : 'Solo preferiti'}
                   >
                     {showFavsOnly ? <StarIcon className="w-3 h-3" /> : <StarOutlineIcon className="w-3 h-3" />}
-                    {l === 'pl' ? 'Ulubione' : l === 'en' ? 'Favourites' : l === 'fr' ? 'Favoris' : 'Preferiti'}
+                    {l === 'pl' ? 'Ulubione' : l === 'en' ? 'Favourites' : l === 'fr' ? 'Favoris' : l === 'es' ? 'Favoritos' : 'Preferiti'}
                   </button>
                 )}
               </div>
@@ -1109,7 +1114,7 @@ const AppInner: React.FC<{
                   onClick={() => setDiffFilter(null)}
                   className={`diff-pill ${diffFilter === null ? 'active' : ''}`}
                 >
-                  {l === 'pl' ? 'Wszystkie' : l === 'en' ? 'All' : l === 'fr' ? 'Tous' : 'Tutti'}
+                  {l === 'pl' ? 'Wszystkie' : l === 'en' ? 'All' : l === 'fr' ? 'Tous' : l === 'es' ? 'Todos' : 'Tutti'}
                 </button>
                 {DIFF_LEVELS.filter(d => filteredHistory.some(lesson => lesson.difficulty_level === d)).map(d => (
                   <button
@@ -1119,7 +1124,7 @@ const AppInner: React.FC<{
                   >
                     {d}
                     <span className="ml-1 opacity-70 font-normal text-[9px]">
-                      {DIFF_LABELS[d]?.[l === 'pl' ? 'pl' : isEn ? 'en' : isFr ? 'fr' : 'it'] ?? ''}
+                      {DIFF_LABELS[d]?.[l === 'pl' ? 'pl' : isEn ? 'en' : isFr ? 'fr' : isEs ? 'es' : 'it'] ?? ''}
                     </span>
                   </button>
                 ))}
@@ -1129,7 +1134,7 @@ const AppInner: React.FC<{
             {!historyLoaded ? (
               <div className="text-center py-12 text-xs animate-pulse" style={{ color: 'var(--c-faint)' }}>
                 <SparklesIcon className="w-4 h-4 mx-auto mb-2" style={{ color: 'var(--c-green)' }} />
-                {l === 'pl' ? 'Wczytywanie biblioteki…' : l === 'en' ? 'Loading library…' : l === 'fr' ? 'Chargement de la bibliothèque…' : 'Caricamento biblioteca…'}
+                {l === 'pl' ? 'Wczytywanie biblioteki…' : l === 'en' ? 'Loading library…' : l === 'fr' ? 'Chargement de la bibliothèque…' : l === 'es' ? 'Cargando biblioteca…' : 'Caricamento biblioteca…'}
               </div>
             ) : history.filter(les => (les.targetLang ?? 'it') === targetLang).length === 0 ? (
               <div className="text-center py-16 rounded-2xl border-2 border-dashed space-y-1.5"
@@ -1140,12 +1145,12 @@ const AppInner: React.FC<{
               </div>
             ) : filteredHistory.length === 0 ? (
               <div className="text-center py-12 text-sm space-y-1" style={{ color: 'var(--c-faint)' }}>
-                {search.trim() ? L.noResults(search) : (l === 'pl' ? 'Brak artykułów spełniających filtry.' : l === 'en' ? 'No articles match the filters.' : l === 'fr' ? 'Aucun article ne correspond aux filtres.' : 'Nessun articolo corrisponde ai filtri.')}
+                {search.trim() ? L.noResults(search) : (l === 'pl' ? 'Brak artykułów spełniających filtry.' : l === 'en' ? 'No articles match the filters.' : l === 'fr' ? 'Aucun article ne correspond aux filtres.' : l === 'es' ? 'Ningún artículo coincide con los filtros.' : 'Nessun articolo corrisponde ai filtri.')}
                 {(diffFilter || showFavsOnly) && (
                   <div>
                     <button onClick={() => { setDiffFilter(null); setShowFavsOnly(false); setSearch(''); }}
                       className="text-xs underline mt-1" style={{ color: 'var(--c-green)' }}>
-                      {l === 'pl' ? 'Wyczyść filtry' : l === 'en' ? 'Clear filters' : l === 'fr' ? 'Effacer les filtres' : 'Azzera filtri'}
+                      {l === 'pl' ? 'Wyczyść filtry' : l === 'en' ? 'Clear filters' : l === 'fr' ? 'Effacer les filtres' : l === 'es' ? 'Limpiar filtros' : 'Azzera filtri'}
                     </button>
                   </div>
                 )}
@@ -1174,7 +1179,7 @@ const AppInner: React.FC<{
                       className="px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all disabled:opacity-30"
                       style={{ background: 'var(--c-surface)', borderColor: 'var(--c-border)', color: 'var(--c-text)' }}
                     >
-                      ← {l === 'pl' ? 'Poprzednia' : l === 'en' ? 'Previous' : l === 'fr' ? 'Précédente' : 'Precedente'}
+                      ← {l === 'pl' ? 'Poprzednia' : l === 'en' ? 'Previous' : l === 'fr' ? 'Précédente' : l === 'es' ? 'Anterior' : 'Precedente'}
                     </button>
                     <div className="flex items-center gap-1">
                       {Array.from({ length: totalPages }, (_, i) => i + 1)
@@ -1208,7 +1213,7 @@ const AppInner: React.FC<{
                       className="px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all disabled:opacity-30"
                       style={{ background: 'var(--c-surface)', borderColor: 'var(--c-border)', color: 'var(--c-text)' }}
                     >
-                      {l === 'pl' ? 'Następna' : l === 'en' ? 'Next' : l === 'fr' ? 'Suivante' : 'Successiva'} →
+                      {l === 'pl' ? 'Następna' : l === 'en' ? 'Next' : l === 'fr' ? 'Suivante' : l === 'es' ? 'Siguiente' : 'Successiva'} →
                     </button>
                   </div>
                 )}
@@ -1226,9 +1231,9 @@ const AppInner: React.FC<{
           </span>
           {filteredHistory.length > 0 && (
             <div className="flex items-center gap-2 text-[10px]">
-              <span style={{ color: 'var(--c-faint)' }}>{l === 'pl' ? 'Skróty:' : l === 'en' ? 'Shortcuts:' : l === 'fr' ? 'Raccourcis :' : 'Scorciatoie:'}</span>
-              <span className="kbd">/</span><span>{l === 'pl' ? 'szukaj' : l === 'en' ? 'search' : l === 'fr' ? 'chercher' : 'cerca'}</span>
-              <span className="kbd">R</span><span>{l === 'pl' ? 'losowa' : l === 'en' ? 'random' : l === 'fr' ? 'aléatoire' : 'casuale'}</span>
+              <span style={{ color: 'var(--c-faint)' }}>{l === 'pl' ? 'Skróty:' : l === 'en' ? 'Shortcuts:' : l === 'fr' ? 'Raccourcis :' : l === 'es' ? 'Atajos:' : 'Scorciatoie:'}</span>
+              <span className="kbd">/</span><span>{l === 'pl' ? 'szukaj' : l === 'en' ? 'search' : l === 'fr' ? 'chercher' : l === 'es' ? 'buscar' : 'cerca'}</span>
+              <span className="kbd">R</span><span>{l === 'pl' ? 'losowa' : l === 'en' ? 'random' : l === 'fr' ? 'aléatoire' : l === 'es' ? 'aleatorio' : 'casuale'}</span>
             </div>
           )}
         </div>
@@ -1257,16 +1262,16 @@ const HomeScreen: React.FC<{ onSelect: (lang: TargetLang) => void }> = ({ onSele
         </p>
       </div>
 
-      <div className="flex flex-col sm:flex-row gap-5 w-full max-w-2xl">
-        {/* Angielski — sortowane alfabetycznie */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-5 w-full max-w-3xl">
+        {/* Angielski */}
         <button
           onClick={() => onSelect('en')}
-          className="flex-1 group card card-hover p-8 flex flex-col items-center gap-4 transition-all"
+          className="group card card-hover p-6 flex flex-col items-center gap-3 transition-all"
         >
-          <Flag code="en" size={56} />
+          <Flag code="en" size={48} />
           <div className="text-center">
-            <p className="font-serif font-bold text-xl" style={{ color: 'var(--c-text)' }}>Angielski</p>
-            <p className="text-xs mt-1" style={{ color: 'var(--c-muted)' }}>Polsko-angielski</p>
+            <p className="font-serif font-bold text-lg" style={{ color: 'var(--c-text)' }}>Angielski</p>
+            <p className="text-xs mt-0.5" style={{ color: 'var(--c-muted)' }}>Polsko-angielski</p>
           </div>
           <span className="text-xs font-semibold group-hover:translate-x-1 transition-transform" style={{ color: 'var(--c-green)' }}>
             Wybierz →
@@ -1276,12 +1281,27 @@ const HomeScreen: React.FC<{ onSelect: (lang: TargetLang) => void }> = ({ onSele
         {/* Francuski */}
         <button
           onClick={() => onSelect('fr')}
-          className="flex-1 group card card-hover p-8 flex flex-col items-center gap-4 transition-all"
+          className="group card card-hover p-6 flex flex-col items-center gap-3 transition-all"
         >
-          <Flag code="fr" size={56} />
+          <Flag code="fr" size={48} />
           <div className="text-center">
-            <p className="font-serif font-bold text-xl" style={{ color: 'var(--c-text)' }}>Francuski</p>
-            <p className="text-xs mt-1" style={{ color: 'var(--c-muted)' }}>Polsko-francuski</p>
+            <p className="font-serif font-bold text-lg" style={{ color: 'var(--c-text)' }}>Francuski</p>
+            <p className="text-xs mt-0.5" style={{ color: 'var(--c-muted)' }}>Polsko-francuski</p>
+          </div>
+          <span className="text-xs font-semibold group-hover:translate-x-1 transition-transform" style={{ color: 'var(--c-green)' }}>
+            Wybierz →
+          </span>
+        </button>
+
+        {/* Hiszpański */}
+        <button
+          onClick={() => onSelect('es')}
+          className="group card card-hover p-6 flex flex-col items-center gap-3 transition-all"
+        >
+          <Flag code="es" size={48} />
+          <div className="text-center">
+            <p className="font-serif font-bold text-lg" style={{ color: 'var(--c-text)' }}>Hiszpański</p>
+            <p className="text-xs mt-0.5" style={{ color: 'var(--c-muted)' }}>Polsko-hiszpański</p>
           </div>
           <span className="text-xs font-semibold group-hover:translate-x-1 transition-transform" style={{ color: 'var(--c-green)' }}>
             Wybierz →
@@ -1291,12 +1311,12 @@ const HomeScreen: React.FC<{ onSelect: (lang: TargetLang) => void }> = ({ onSele
         {/* Włoski */}
         <button
           onClick={() => onSelect('it')}
-          className="flex-1 group card card-hover p-8 flex flex-col items-center gap-4 transition-all"
+          className="group card card-hover p-6 flex flex-col items-center gap-3 transition-all"
         >
-          <Flag code="it" size={56} />
+          <Flag code="it" size={48} />
           <div className="text-center">
-            <p className="font-serif font-bold text-xl" style={{ color: 'var(--c-text)' }}>Włoski</p>
-            <p className="text-xs mt-1" style={{ color: 'var(--c-muted)' }}>Polsko-włoski</p>
+            <p className="font-serif font-bold text-lg" style={{ color: 'var(--c-text)' }}>Włoski</p>
+            <p className="text-xs mt-0.5" style={{ color: 'var(--c-muted)' }}>Polsko-włoski</p>
           </div>
           <span className="text-xs font-semibold group-hover:translate-x-1 transition-transform" style={{ color: 'var(--c-green)' }}>
             Wybierz →
@@ -1314,7 +1334,7 @@ const App: React.FC = () => {
   const [showKeyModal, setShowKeyModal] = useState(false);
   const [targetLang, setTargetLang] = useState<TargetLang | null>(() => {
     const saved = localStorage.getItem(APP_MODE_KEY) as TargetLang | null;
-    return saved === 'it' || saved === 'en' || saved === 'fr' ? saved : null;
+    return saved === 'it' || saved === 'en' || saved === 'fr' || saved === 'es' ? saved : null;
   });
 
   const saveApiKey = (key: string) => {

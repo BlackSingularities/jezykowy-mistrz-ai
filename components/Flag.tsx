@@ -5,7 +5,7 @@ import React from 'react';
 // Polish flag:  white / red (2 horizontal stripes)
 
 interface FlagProps {
-  code: 'it' | 'pl' | 'en' | 'fr';
+  code: 'it' | 'pl' | 'en' | 'fr' | 'es';
   /** Height in px; width is auto (1.5× for IT, same for PL) */
   size?: number;
   className?: string;
@@ -21,7 +21,7 @@ export const Flag: React.FC<FlagProps> = ({
   'aria-hidden': ariaHidden,
 }) => {
   const hidden = ariaHidden === true || ariaHidden === 'true';
-  const label = hidden ? undefined : (ariaLabel ?? (code === 'it' ? 'Flaga Włoch' : code === 'en' ? 'Flaga Wielkiej Brytanii' : code === 'fr' ? 'Flaga Francji' : 'Flaga Polski'));
+  const label = hidden ? undefined : (ariaLabel ?? (code === 'it' ? 'Flaga Włoch' : code === 'en' ? 'Flaga Wielkiej Brytanii' : code === 'fr' ? 'Flaga Francji' : code === 'es' ? 'Flaga Hiszpanii' : 'Flaga Polski'));
   const w = Math.round(size * 1.5);
   const h = size;
 
@@ -64,6 +64,11 @@ export const Flag: React.FC<FlagProps> = ({
           <rect x="1" width="1" height="2" fill="#ffffff"/>
           <rect x="2" width="1" height="2" fill="#ED2939"/>
         </svg>
+      ) : code === 'es' ? (
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 3 2" width={w} height={h} style={{ display: 'block' }}>
+          <rect width="3" height="2" fill="#c60b1e"/>
+          <rect width="3" height="1" y="0.5" fill="#ffc400"/>
+        </svg>
       ) : (
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 8 5" width={w} height={h} style={{ display: 'block' }}>
           <rect width="8" height="5" fill="#ffffff"/>
@@ -77,7 +82,7 @@ export const Flag: React.FC<FlagProps> = ({
 // ─── Convenience: flag that auto-follows current language ─────────────────────
 
 export const LangFlag: React.FC<{
-  lang: 'it' | 'pl' | 'en' | 'fr';
+  lang: 'it' | 'pl' | 'en' | 'fr' | 'es';
   size?: number;
   className?: string;
 }> = ({ lang, size = 16, className }) => (

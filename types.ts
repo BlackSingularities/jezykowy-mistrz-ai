@@ -1,12 +1,13 @@
 // ─── Primitives ───────────────────────────────────────────────────────────────
 
-export type Lang = 'it' | 'pl' | 'en' | 'fr';
-export type TargetLang = 'it' | 'en' | 'fr'; // język docelowy nauki
+export type Lang = 'it' | 'pl' | 'en' | 'fr' | 'es';
+export type TargetLang = 'it' | 'en' | 'fr' | 'es'; // język docelowy nauki
 
 export interface Bilingual {
   it?: string;
   en?: string;
   fr?: string;
+  es?: string;
   pl: string;
 }
 
