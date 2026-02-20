@@ -506,7 +506,12 @@ const ChangeKeyModal: React.FC<{ onClose: () => void; onSave: (key: string) => v
 
 const DIFF_LEVELS = ['A1', 'A2', 'B1', 'B2', 'C1'] as const;
 
-const AppInner: React.FC<{ apiKey: string; onChangeKey: () => void; onBackToHome: () => void }> = ({ apiKey, onChangeKey, onBackToHome }) => {
+const AppInner: React.FC<{
+  apiKey: string;
+  onChangeKey: () => void;
+  onBackToHome: () => void;
+  onChangeLang: (lang: TargetLang) => void;
+}> = ({ apiKey, onChangeKey, onBackToHome, onChangeLang }) => {
   const { globalLang, toggleGlobal, targetLang } = useLang();
   const { theme, toggleTheme } = useTheme();
   const { fontSizeIndex, increaseFontSize, decreaseFontSize } = useFontSize();
@@ -700,6 +705,39 @@ const AppInner: React.FC<{ apiKey: string; onChangeKey: () => void; onBackToHome
   const handleModelChange = (modelId: string) => {
     setActiveModel(modelId);
     saveModel(modelId);
+  };
+
+  // ── Open a completed queue lesson (may be in a different language) ──────────
+  const [openingLessonId, setOpeningLessonId] = useState<string | null>(null);
+
+  const openQueueLesson = async (job: QueueItem) => {
+    if (!job.lessonId) return;
+    setOpeningLessonId(job.lessonId);
+    try {
+      // Look in local history first
+      let lesson = history.find(h => h.id === job.lessonId) ?? null;
+
+      // If not loaded yet, fetch directly from server
+      if (!lesson) {
+        const res = await fetch(`/api/history/${job.lessonId}`);
+        if (res.ok) {
+          lesson = await res.json();
+          if (lesson) setHistory(prev => [lesson!, ...prev.filter(l => l.id !== lesson!.id)]);
+        }
+      }
+
+      if (!lesson) return;
+
+      // Switch to the lesson's language if it differs from current
+      const lessonLang = (lesson.targetLang ?? job.targetLang ?? 'it') as TargetLang;
+      if (lessonLang !== targetLang) {
+        onChangeLang(lessonLang);
+      }
+
+      setActiveLesson(lesson);
+    } finally {
+      setOpeningLessonId(null);
+    }
   };
 
   // Reset to page 1 when filters change
@@ -969,14 +1007,14 @@ const AppInner: React.FC<{ apiKey: string; onChangeKey: () => void; onBackToHome
                       {job.status === 'pending' && (l === 'pl' ? 'W kolejce' : l === 'en' ? 'Queued' : l === 'fr' ? 'En attente' : 'In attesa')}
                       {job.status === 'done' && (
                         <button
-                          onClick={() => {
-                            const lesson = history.find(h => h.id === job.lessonId);
-                            if (lesson) setActiveLesson(lesson);
-                          }}
-                          className="underline font-bold"
+                          onClick={() => openQueueLesson(job)}
+                          disabled={openingLessonId === job.lessonId}
+                          className="underline font-bold disabled:opacity-50"
                           style={{ color: 'var(--c-green)' }}
                         >
-                          {l === 'pl' ? 'Otwórz →' : l === 'en' ? 'Open →' : l === 'fr' ? 'Ouvrir →' : 'Apri →'}
+                          {openingLessonId === job.lessonId
+                            ? (l === 'pl' ? 'Ładuję…' : l === 'en' ? 'Loading…' : l === 'fr' ? 'Chargement…' : 'Carico…')
+                            : (l === 'pl' ? 'Otwórz →' : l === 'en' ? 'Open →' : l === 'fr' ? 'Ouvrir →' : 'Apri →')}
                         </button>
                       )}
                       {job.status === 'error' && (
@@ -1309,7 +1347,7 @@ const App: React.FC = () => {
       {showKeyModal && (
         <ChangeKeyModal onClose={() => setShowKeyModal(false)} onSave={saveApiKey} />
       )}
-      <AppInner apiKey={apiKey} onChangeKey={() => setShowKeyModal(true)} onBackToHome={goHome} />
+      <AppInner apiKey={apiKey} onChangeKey={() => setShowKeyModal(true)} onBackToHome={goHome} onChangeLang={selectLang} />
     </LangProvider>
   );
 };
