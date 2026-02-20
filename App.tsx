@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, FormEvent } from 'react';
 import { createRoot } from 'react-dom/client';
-import { loadModels, getSavedModel, saveModel, ORModel, generateSpanishLesson, generateCzechLesson } from './services/geminiService';
+import { loadModels, getSavedModel, saveModel, ORModel, generateSpanishLesson, generateCzechLesson, generateRussianLesson } from './services/geminiService';
 import { LessonView, getFavorites, toggleFavorite } from './components/LessonView';
 import { LangProvider, useLang, useTheme, useFontSize } from './context/LangContext';
 import { Flag, LangFlag } from './components/Flag';
@@ -30,7 +30,7 @@ interface QueueItem {
   qid: string;       // unique queue id
   topic: string;
   status: QueueStatus;
-  targetLang?: 'it' | 'en' | 'fr' | 'es' | 'de' | 'cs';
+  targetLang?: 'it' | 'en' | 'fr' | 'es' | 'de' | 'cs' | 'ru';
   lessonId?: string; // set when done
   error?: string;
   startedAt?: number;
@@ -100,12 +100,12 @@ const DIFF_GRADIENT: Record<string, string> = {
   C1: 'from-violet-500 to-purple-700',
 };
 
-const DIFF_LABELS: Record<string, { pl: string; it: string; en: string; fr: string; es: string; de: string; cs: string }> = {
-  A1: { pl: 'Początkujący',        it: 'Principiante',    en: 'Beginner',           fr: 'Débutant',           es: 'Principiante',    de: 'Anfänger',         cs: 'Začátečník'     },
-  A2: { pl: 'Elementarny',         it: 'Elementare',      en: 'Elementary',         fr: 'Élémentaire',        es: 'Elemental',       de: 'Grundkenntnisse',  cs: 'Elementární'    },
-  B1: { pl: 'Średniozaawansowany', it: 'Intermedio',      en: 'Intermediate',       fr: 'Intermédiaire',      es: 'Intermedio',      de: 'Mittelstufe',      cs: 'Středně pokročilý'},
-  B2: { pl: 'Wyższy średni',       it: 'Intermedio sup.', en: 'Upper-Intermediate', fr: 'Interm. supérieur',  es: 'Interm. superior',de: 'Gute Mittelstufe', cs: 'Vyšší středně pokr.'},
-  C1: { pl: 'Zaawansowany',        it: 'Avanzato',        en: 'Advanced',           fr: 'Avancé',             es: 'Avanzado',        de: 'Fortgeschritten',  cs: 'Pokročilý'      },
+const DIFF_LABELS: Record<string, { pl: string; it: string; en: string; fr: string; es: string; de: string; cs: string; ru: string }> = {
+  A1: { pl: 'Początkujący',        it: 'Principiante',    en: 'Beginner',           fr: 'Débutant',           es: 'Principiante',    de: 'Anfänger',         cs: 'Začátečník',      ru: 'Начинающий'      },
+  A2: { pl: 'Elementarny',         it: 'Elementare',      en: 'Elementary',         fr: 'Élémentaire',        es: 'Elemental',       de: 'Grundkenntnisse',  cs: 'Elementární',     ru: 'Элементарный'    },
+  B1: { pl: 'Średniozaawansowany', it: 'Intermedio',      en: 'Intermediate',       fr: 'Intermédiaire',      es: 'Intermedio',      de: 'Mittelstufe',      cs: 'Středně pokročilý', ru: 'Средний'        },
+  B2: { pl: 'Wyższy średni',       it: 'Intermedio sup.', en: 'Upper-Intermediate', fr: 'Interm. supérieur',  es: 'Interm. superior',de: 'Gute Mittelstufe', cs: 'Vyšší středně pokr.', ru: 'Выше среднего' },
+  C1: { pl: 'Zaawansowany',        it: 'Avanzato',        en: 'Advanced',           fr: 'Avancé',             es: 'Avanzado',        de: 'Fortgeschritten',  cs: 'Pokročilý',       ru: 'Продвинутый'     },
 };
 
 // ─── ModelPicker ──────────────────────────────────────────────────────────────
@@ -114,7 +114,7 @@ const ModelPicker: React.FC<{
   apiKey: string;
   activeModel: string;
   onChange: (modelId: string) => void;
-  lang: 'it' | 'pl' | 'en' | 'fr' | 'es' | 'de' | 'cs';
+  lang: 'it' | 'pl' | 'en' | 'fr' | 'es' | 'de' | 'cs' | 'ru';
 }> = ({ apiKey, activeModel, onChange, lang }) => {
   const [open, setOpen] = useState(false);
   const [models, setModels] = useState<ORModel[]>([]);
@@ -143,7 +143,7 @@ const ModelPicker: React.FC<{
       // sortuj: darmowe/popularne najpierw (po nazwie)
       setModels(list.sort((a, b) => a.id.localeCompare(b.id)));
     } catch {
-      setError(lang === 'it' ? 'Impossibile caricare i modelli.' : lang === 'en' ? 'Could not load models.' : lang === 'fr' ? 'Impossible de charger les modèles.' : lang === 'es' ? 'No se pudieron cargar los modelos.' : lang === 'de' ? 'Modelle konnten nicht geladen werden.' : lang === 'cs' ? 'Nepodařilo se načíst modely.' : 'Nie udało się załadować modeli.');
+      setError(lang === 'it' ? 'Impossibile caricare i modelli.' : lang === 'en' ? 'Could not load models.' : lang === 'fr' ? 'Impossible de charger les modèles.' : lang === 'es' ? 'No se pudieron cargar los modelos.' : lang === 'de' ? 'Modelle konnten nicht geladen werden.' : lang === 'cs' ? 'Nepodařilo se načíst modely.' : lang === 'ru' ? 'Не удалось загрузить модели.' : 'Nie udało się załadować modeli.');
     } finally {
       setLoading(false);
     }
@@ -194,7 +194,7 @@ const ModelPicker: React.FC<{
                 type="text"
                 value={query}
                 onChange={e => setQuery(e.target.value)}
-                placeholder={lang === 'it' ? 'Cerca modello…' : lang === 'en' ? 'Search model…' : lang === 'fr' ? 'Rechercher un modèle…' : lang === 'es' ? 'Buscar modelo…' : lang === 'de' ? 'Modell suchen…' : lang === 'cs' ? 'Hledat model…' : 'Szukaj modelu…'}
+                placeholder={lang === 'it' ? 'Cerca modello…' : lang === 'en' ? 'Search model…' : lang === 'fr' ? 'Rechercher un modèle…' : lang === 'es' ? 'Buscar modelo…' : lang === 'de' ? 'Modell suchen…' : lang === 'cs' ? 'Hledat model…' : lang === 'ru' ? 'Поиск модели…' : 'Szukaj modelu…'}
                 className="w-full pl-8 pr-3 py-1.5 text-xs rounded-lg outline-none"
                 style={{ background: 'var(--c-bg)', border: '1px solid var(--c-border)', color: 'var(--c-text)' }}
               />
@@ -206,7 +206,7 @@ const ModelPicker: React.FC<{
             {loading && (
               <div className="flex items-center justify-center gap-2 py-6 text-xs" style={{ color: 'var(--c-muted)' }}>
                 <SparklesIcon className="w-3.5 h-3.5 animate-spin" style={{ color: 'var(--c-green)' }} />
-                {lang === 'it' ? 'Caricamento…' : lang === 'en' ? 'Loading…' : lang === 'fr' ? 'Chargement…' : lang === 'es' ? 'Cargando…' : lang === 'de' ? 'Laden…' : lang === 'cs' ? 'Načítání…' : 'Ładowanie…'}
+                {lang === 'it' ? 'Caricamento…' : lang === 'en' ? 'Loading…' : lang === 'fr' ? 'Chargement…' : lang === 'es' ? 'Cargando…' : lang === 'de' ? 'Laden…' : lang === 'cs' ? 'Načítání…' : lang === 'ru' ? 'Загрузка…' : 'Ładowanie…'}
               </div>
             )}
             {error && (
@@ -214,7 +214,7 @@ const ModelPicker: React.FC<{
             )}
             {!loading && !error && filtered.length === 0 && (
               <p className="text-xs text-center py-4" style={{ color: 'var(--c-faint)' }}>
-                {lang === 'it' ? 'Nessun risultato.' : lang === 'en' ? 'No results.' : lang === 'fr' ? 'Aucun résultat.' : lang === 'es' ? 'Sin resultados.' : lang === 'de' ? 'Keine Ergebnisse.' : lang === 'cs' ? 'Žádné výsledky.' : 'Brak wyników.'}
+                {lang === 'it' ? 'Nessun risultato.' : lang === 'en' ? 'No results.' : lang === 'fr' ? 'Aucun résultat.' : lang === 'es' ? 'Sin resultados.' : lang === 'de' ? 'Keine Ergebnisse.' : lang === 'cs' ? 'Žádné výsledky.' : lang === 'ru' ? 'Нет результатов.' : 'Brak wyników.'}
               </p>
             )}
             {!loading && filtered.map(m => {
@@ -328,7 +328,7 @@ const ApiKeySetup: React.FC<{ onSave: (key: string) => void }> = ({ onSave }) =>
 
 const LessonCard: React.FC<{
   lesson: Lesson;
-  lang: 'it' | 'pl' | 'en' | 'fr' | 'es' | 'de' | 'cs';
+  lang: 'it' | 'pl' | 'en' | 'fr' | 'es' | 'de' | 'cs' | 'ru';
   onOpen: () => void;
   onDelete: (e: React.MouseEvent) => void;
   isFav: boolean;
@@ -338,8 +338,8 @@ const LessonCard: React.FC<{
   const gradient = DIFF_GRADIENT[lesson.difficulty_level] ?? DIFF_GRADIENT.B1;
   const diffLabels = DIFF_LABELS[lesson.difficulty_level];
   const diffLabel = diffLabels ? diffLabels[lang === 'pl' ? 'pl' : (tl in diffLabels ? tl as keyof typeof diffLabels : 'it')] : lesson.difficulty_level;
-  const getTlText = (b?: { it?: string; en?: string; fr?: string; es?: string; de?: string; cs?: string; pl: string }) =>
-    b ? (tl === 'en' ? b.en : tl === 'fr' ? b.fr : tl === 'es' ? b.es : tl === 'de' ? b.de : tl === 'cs' ? b.cs : b.it) ?? b.pl : '';
+  const getTlText = (b?: { it?: string; en?: string; fr?: string; es?: string; de?: string; cs?: string; ru?: string; pl: string }) =>
+    b ? (tl === 'en' ? b.en : tl === 'fr' ? b.fr : tl === 'es' ? b.es : tl === 'de' ? b.de : tl === 'cs' ? b.cs : tl === 'ru' ? b.ru : b.it) ?? b.pl : '';
   const topicText = lang === 'pl' ? lesson.topic.pl : getTlText(lesson.topic);
   const subtitleText = lesson.subtitle ? (lang === 'pl' ? lesson.subtitle.pl : getTlText(lesson.subtitle)) : null;
   const introText = lang === 'pl' ? lesson.introduction?.pl : getTlText(lesson.introduction);
@@ -406,7 +406,7 @@ const LessonCard: React.FC<{
         )}
         {lesson.vocabulary?.length > 0 && (
           <div>
-            <p className="micro-label mb-1">{lang === 'pl' ? 'Kluczowe słowa' : lang === 'en' ? 'Key words' : lang === 'fr' ? 'Mots clés' : lang === 'es' ? 'Palabras clave' : lang === 'de' ? 'Schlüsselwörter' : lang === 'cs' ? 'Klíčová slova' : 'Parole chiave'}</p>
+            <p className="micro-label mb-1">{lang === 'pl' ? 'Kluczowe słowa' : lang === 'en' ? 'Key words' : lang === 'fr' ? 'Mots clés' : lang === 'es' ? 'Palabras clave' : lang === 'de' ? 'Schlüsselwörter' : lang === 'cs' ? 'Klíčová slova' : lang === 'ru' ? 'Ключевые слова' : 'Parole chiave'}</p>
             <div className="flex flex-wrap gap-1">
               {lesson.vocabulary.slice(0, 3).map((v, i) => (
                 <span key={i} className="inline-flex items-center gap-1 text-xs rounded px-2 py-0.5 font-medium"
@@ -436,7 +436,7 @@ const LessonCard: React.FC<{
           )}
         </div>
         <span className="font-semibold group-hover:translate-x-1 transition-transform" style={{ color: 'var(--c-green)' }}>
-          {lang === 'pl' ? 'Czytaj →' : lang === 'en' ? 'Read →' : lang === 'fr' ? 'Lire →' : lang === 'es' ? 'Leer →' : lang === 'de' ? 'Lesen →' : lang === 'cs' ? 'Číst →' : 'Leggi →'}
+          {lang === 'pl' ? 'Czytaj →' : lang === 'en' ? 'Read →' : lang === 'fr' ? 'Lire →' : lang === 'es' ? 'Leer →' : lang === 'de' ? 'Lesen →' : lang === 'cs' ? 'Číst →' : lang === 'ru' ? 'Читать →' : 'Leggi →'}
         </span>
       </div>
     </article>
@@ -454,7 +454,7 @@ const ChangeKeyModal: React.FC<{ onClose: () => void; onSave: (key: string) => v
     e.preventDefault();
     const trimmed = value.trim();
     if (!trimmed.startsWith('sk-or-')) {
-      setError(l === 'pl' ? 'Klucz powinien zaczynać się od "sk-or-".' : l === 'en' ? 'Key must start with "sk-or-".' : l === 'fr' ? 'La clé doit commencer par "sk-or-".' : l === 'es' ? 'La clave debe comenzar con "sk-or-".' : l === 'de' ? 'Der Schlüssel muss mit "sk-or-" beginnen.' : l === 'cs' ? 'Klíč musí začínat "sk-or-".' : 'La chiave deve iniziare con "sk-or-".');
+      setError(l === 'pl' ? 'Klucz powinien zaczynać się od "sk-or-".' : l === 'en' ? 'Key must start with "sk-or-".' : l === 'fr' ? 'La clé doit commencer par "sk-or-".' : l === 'es' ? 'La clave debe comenzar con "sk-or-".' : l === 'de' ? 'Der Schlüssel muss mit "sk-or-" beginnen.' : l === 'cs' ? 'Klíč musí začínat "sk-or-".' : l === 'ru' ? 'Ключ должен начинаться с "sk-or-".' : 'La chiave deve iniziare con "sk-or-".');
       return;
     }
     onSave(trimmed);
@@ -471,10 +471,10 @@ const ChangeKeyModal: React.FC<{ onClose: () => void; onSave: (key: string) => v
         </button>
         <div>
           <h2 className="font-serif font-bold text-base" style={{ color: 'var(--c-text)' }}>
-            {l === 'pl' ? 'Zmień klucz API' : l === 'en' ? 'Change API Key' : l === 'fr' ? 'Changer la clé API' : l === 'es' ? 'Cambiar clave API' : l === 'de' ? 'API-Schlüssel ändern' : l === 'cs' ? 'Změnit API klíč' : 'Cambia chiave API'}
+            {l === 'pl' ? 'Zmień klucz API' : l === 'en' ? 'Change API Key' : l === 'fr' ? 'Changer la clé API' : l === 'es' ? 'Cambiar clave API' : l === 'de' ? 'API-Schlüssel ändern' : l === 'cs' ? 'Změnit API klíč' : l === 'ru' ? 'Изменить API ключ' : 'Cambia chiave API'}
           </h2>
           <p className="text-xs mt-0.5" style={{ color: 'var(--c-muted)' }}>
-            {l === 'pl' ? 'Podaj nowy klucz OpenRouter.' : l === 'en' ? 'Enter a new OpenRouter key.' : l === 'fr' ? 'Entrez une nouvelle clé OpenRouter.' : l === 'es' ? 'Introduce una nueva clave OpenRouter.' : l === 'de' ? 'Geben Sie einen neuen OpenRouter-Schlüssel ein.' : l === 'cs' ? 'Zadejte nový klíč OpenRouter.' : 'Inserisci una nuova chiave OpenRouter.'}
+            {l === 'pl' ? 'Podaj nowy klucz OpenRouter.' : l === 'en' ? 'Enter a new OpenRouter key.' : l === 'fr' ? 'Entrez une nouvelle clé OpenRouter.' : l === 'es' ? 'Introduce una nueva clave OpenRouter.' : l === 'de' ? 'Geben Sie einen neuen OpenRouter-Schlüssel ein.' : l === 'cs' ? 'Zadejte nový klíč OpenRouter.' : l === 'ru' ? 'Введите новый ключ OpenRouter.' : 'Inserisci una nuova chiave OpenRouter.'}
           </p>
         </div>
         <form onSubmit={handleSubmit} className="space-y-3">
@@ -494,7 +494,7 @@ const ChangeKeyModal: React.FC<{ onClose: () => void; onSave: (key: string) => v
             className="w-full py-2 rounded-lg font-semibold text-sm transition-colors disabled:opacity-40"
             style={{ background: 'var(--c-text)', color: '#fff' }}
           >
-            {l === 'pl' ? 'Zapisz' : l === 'en' ? 'Save' : l === 'fr' ? 'Enregistrer' : l === 'es' ? 'Guardar' : l === 'de' ? 'Speichern' : l === 'cs' ? 'Uložit' : 'Salva'}
+            {l === 'pl' ? 'Zapisz' : l === 'en' ? 'Save' : l === 'fr' ? 'Enregistrer' : l === 'es' ? 'Guardar' : l === 'de' ? 'Speichern' : l === 'cs' ? 'Uložit' : l === 'ru' ? 'Сохранить' : 'Salva'}
           </button>
         </form>
       </div>
@@ -518,6 +518,7 @@ const AppInner: React.FC<{
   const isEs = targetLang === 'es';
   const isDe = targetLang === 'de';
   const isCs = targetLang === 'cs';
+  const isRu = targetLang === 'ru';
 
   const [input, setInput] = useState('');
   const [history, setHistory] = useState<Lesson[]>([]);
@@ -565,7 +566,7 @@ const AppInner: React.FC<{
           qid: sj.id,
           topic: sj.topic,
           status: sj.status as QueueStatus,
-          targetLang: sj.targetLang as 'it' | 'en' | 'fr' | 'es' | 'de' | 'cs' | undefined,
+          targetLang: sj.targetLang as 'it' | 'en' | 'fr' | 'es' | 'de' | 'cs' | 'ru' | undefined,
           lessonId: sj.lessonId,
           error: sj.error,
           startedAt: sj.createdAt,
@@ -732,7 +733,7 @@ const AppInner: React.FC<{
       if (!lesson) return;
 
       // Switch to the lesson's language if it differs from current
-      const lessonLang = (lesson.targetLang ?? job.targetLang ?? 'it') as TargetLang; // 'it' | 'en' | 'fr' | 'es' | 'de' | 'cs'
+      const lessonLang = (lesson.targetLang ?? job.targetLang ?? 'it') as TargetLang; // 'it' | 'en' | 'fr' | 'es' | 'de' | 'cs' | 'ru'
       if (lessonLang !== targetLang) {
         onChangeLang(lessonLang);
       }
@@ -760,6 +761,8 @@ const AppInner: React.FC<{
           (lesson.topic.fr ?? '').toLowerCase().includes(q) ||
           (lesson.topic.es ?? '').toLowerCase().includes(q) ||
           (lesson.topic.de ?? '').toLowerCase().includes(q) ||
+          (lesson.topic.cs ?? '').toLowerCase().includes(q) ||
+          (lesson.topic.ru ?? '').toLowerCase().includes(q) ||
           lesson.tags?.some(t => t.toLowerCase().includes(q))
         );
       }
@@ -784,19 +787,19 @@ const AppInner: React.FC<{
   const isEn = targetLang === 'en';
   const isFr = targetLang === 'fr';
   const L = {
-    appName:      l === 'pl' ? 'Językowy Mistrz AI' : isEn ? 'Language Master AI' : isFr ? 'Maître Linguistique IA' : isEs ? 'Maestro de Idiomas IA' : isDe ? 'Sprachmeister KI' : isCs ? 'Jazykový Mistr AI' : 'Maestro Linguistico AI',
-    headline:     l === 'pl' ? 'O czym chcesz dzisiaj poczytać?' : isEn ? 'What do you want to read about today?' : isFr ? "De quoi voulez-vous lire aujourd'hui ?" : isEs ? '¿Sobre qué quieres leer hoy?' : isDe ? 'Worüber möchten Sie heute lesen?' : isCs ? 'O čem si chcete dnes přečíst?' : 'Di cosa vuoi leggere oggi?',
-    subtitle:     l === 'pl' ? 'Twórz artykuły, lekcje i opracowania kulturowe z AI.' : isEn ? 'Create articles, lessons and cultural insights with AI.' : isFr ? "Créez des articles, des leçons et des analyses culturelles avec l'IA." : isEs ? 'Crea artículos, lecciones y análisis culturales con IA.' : isDe ? 'Erstellen Sie Artikel, Lektionen und Kulturanalysen mit KI.' : isCs ? 'Vytvářejte články, lekce a kulturní rozbory s AI.' : "Crea articoli, lezioni e approfondimenti culturali con l'AI.",
-    placeholder:  l === 'pl' ? 'Temat… (kilka linii = kilka artykułów równolegle)' : isEn ? 'Topic… (multiple lines = parallel articles)' : isFr ? 'Sujet… (plusieurs lignes = plusieurs articles en parallèle)' : isEs ? 'Tema… (varias líneas = varios artículos en paralelo)' : isDe ? 'Thema… (mehrere Zeilen = mehrere Artikel parallel)' : isCs ? 'Téma… (více řádků = více článků najednou)' : 'Argomento… (più righe = più articoli in parallelo)',
-    generating:   l === 'pl' ? 'Generowanie — to może chwilę zająć…' : isEn ? 'Generating — this may take a moment…' : isFr ? 'Génération en cours…' : isEs ? 'Generando…' : isDe ? 'Wird generiert…' : isCs ? 'Generování — chvíli to potrvá…' : 'Generazione in corso…',
-    yourArticles: l === 'pl' ? 'Twoje artykuły' : isEn ? 'Your articles' : isFr ? 'Vos articles' : isEs ? 'Tus artículos' : isDe ? 'Ihre Artikel' : isCs ? 'Vaše články' : 'I tuoi articoli',
-    search:       l === 'pl' ? 'Szukaj…' : isEn ? 'Search…' : isFr ? 'Rechercher…' : isEs ? 'Buscar…' : isDe ? 'Suchen…' : isCs ? 'Hledat…' : 'Cerca…',
-    noArticles:   l === 'pl' ? 'Brak artykułów. Stwórz swój pierwszy!' : isEn ? 'No articles yet. Create your first!' : isFr ? 'Pas encore d\'articles. Créez le vôtre !' : isEs ? '¡Sin artículos. ¡Crea el primero!' : isDe ? 'Keine Artikel. Erstellen Sie Ihren ersten!' : isCs ? 'Žádné články. Vytvořte svůj první!' : 'Nessun articolo. Crea il tuo primo!',
-    noArticlesSub:l === 'pl' ? (isIt ? 'Np. "Pizza", "Rzym" lub "Wenecja"' : isFr ? 'Np. "Cuisine", "Paris" lub "Culture française"' : isEs ? 'Np. "Tapas", "Madrid" lub "Cultura española"' : isDe ? 'Z.B. "Brot", "Berlin" oder "Deutsche Kultur"' : isCs ? 'Np. "Praha", "Svíčková" lub "Česká kultura"' : 'Np. "greetings", "food" lub "British culture"') : isEn ? 'E.g. "Greetings", "Food" or "British culture"' : isFr ? 'Ex. "Cuisine", "Paris" ou "Culture française"' : isEs ? 'Ej. "Tapas", "Madrid" o "Cultura española"' : isDe ? 'Z.B. "Brot", "Berlin" oder "Deutsche Kultur"' : isCs ? 'Např. "Praha", "Svíčková" nebo "Česká kultura"' : 'Es. "Pizza", "Roma" o "Venezia"',
-    noResults:    (q: string) => l === 'pl' ? `Brak wyników dla "${q}"` : isEn ? `No results for "${q}"` : isFr ? `Aucun résultat pour "${q}"` : isEs ? `Sin resultados para "${q}"` : isDe ? `Keine Ergebnisse für "${q}"` : isCs ? `Žádné výsledky pro "${q}"` : `Nessun risultato per "${q}"`,
-    langToggle:   l === 'pl' ? 'Zmień język' : isEn ? 'Change language' : isFr ? 'Changer de langue' : isEs ? 'Cambiar idioma' : isDe ? 'Sprache wechseln' : isCs ? 'Změnit jazyk' : 'Cambia lingua',
-    apiKey:       l === 'pl' ? 'Zmień klucz API' : isEn ? 'Change API key' : isFr ? 'Changer la clé API' : isEs ? 'Cambiar clave API' : isDe ? 'API-Schlüssel ändern' : isCs ? 'Změnit API klíč' : 'Cambia chiave API',
-    backToHome:   l === 'pl' ? 'Zmień tryb' : isEn ? 'Change mode' : isFr ? 'Changer de mode' : isEs ? 'Cambiar modo' : isDe ? 'Modus wechseln' : isCs ? 'Změnit režim' : 'Cambia modalità',
+    appName:      l === 'pl' ? 'Językowy Mistrz AI' : isEn ? 'Language Master AI' : isFr ? 'Maître Linguistique IA' : isEs ? 'Maestro de Idiomas IA' : isDe ? 'Sprachmeister KI' : isCs ? 'Jazykový Mistr AI' : isRu ? 'Языковой Мастер ИИ' : 'Maestro Linguistico AI',
+    headline:     l === 'pl' ? 'O czym chcesz dzisiaj poczytać?' : isEn ? 'What do you want to read about today?' : isFr ? "De quoi voulez-vous lire aujourd'hui ?" : isEs ? '¿Sobre qué quieres leer hoy?' : isDe ? 'Worüber möchten Sie heute lesen?' : isCs ? 'O čem si chcete dnes přečíst?' : isRu ? 'О чём вы хотите почитать сегодня?' : 'Di cosa vuoi leggere oggi?',
+    subtitle:     l === 'pl' ? 'Twórz artykuły, lekcje i opracowania kulturowe z AI.' : isEn ? 'Create articles, lessons and cultural insights with AI.' : isFr ? "Créez des articles, des leçons et des analyses culturelles avec l'IA." : isEs ? 'Crea artículos, lecciones y análisis culturales con IA.' : isDe ? 'Erstellen Sie Artikel, Lektionen und Kulturanalysen mit KI.' : isCs ? 'Vytvářejte články, lekce a kulturní rozbory s AI.' : isRu ? 'Создавайте статьи, уроки и культурные материалы с ИИ.' : "Crea articoli, lezioni e approfondimenti culturali con l'AI.",
+    placeholder:  l === 'pl' ? 'Temat… (kilka linii = kilka artykułów równolegle)' : isEn ? 'Topic… (multiple lines = parallel articles)' : isFr ? 'Sujet… (plusieurs lignes = plusieurs articles en parallèle)' : isEs ? 'Tema… (varias líneas = varios artículos en paralelo)' : isDe ? 'Thema… (mehrere Zeilen = mehrere Artikel parallel)' : isCs ? 'Téma… (více řádků = více článků najednou)' : isRu ? 'Тема… (несколько строк = несколько статей одновременно)' : 'Argomento… (più righe = più articoli in parallelo)',
+    generating:   l === 'pl' ? 'Generowanie — to może chwilę zająć…' : isEn ? 'Generating — this may take a moment…' : isFr ? 'Génération en cours…' : isEs ? 'Generando…' : isDe ? 'Wird generiert…' : isCs ? 'Generování — chvíli to potrvá…' : isRu ? 'Генерация — это может занять момент…' : 'Generazione in corso…',
+    yourArticles: l === 'pl' ? 'Twoje artykuły' : isEn ? 'Your articles' : isFr ? 'Vos articles' : isEs ? 'Tus artículos' : isDe ? 'Ihre Artikel' : isCs ? 'Vaše články' : isRu ? 'Ваши статьи' : 'I tuoi articoli',
+    search:       l === 'pl' ? 'Szukaj…' : isEn ? 'Search…' : isFr ? 'Rechercher…' : isEs ? 'Buscar…' : isDe ? 'Suchen…' : isCs ? 'Hledat…' : isRu ? 'Поиск…' : 'Cerca…',
+    noArticles:   l === 'pl' ? 'Brak artykułów. Stwórz swój pierwszy!' : isEn ? 'No articles yet. Create your first!' : isFr ? 'Pas encore d\'articles. Créez le vôtre !' : isEs ? '¡Sin artículos. ¡Crea el primero!' : isDe ? 'Keine Artikel. Erstellen Sie Ihren ersten!' : isCs ? 'Žádné články. Vytvořte svůj první!' : isRu ? 'Нет статей. Создайте первую!' : 'Nessun articolo. Crea il tuo primo!',
+    noArticlesSub:l === 'pl' ? (isIt ? 'Np. "Pizza", "Rzym" lub "Wenecja"' : isFr ? 'Np. "Cuisine", "Paris" lub "Culture française"' : isEs ? 'Np. "Tapas", "Madrid" lub "Cultura española"' : isDe ? 'Z.B. "Brot", "Berlin" oder "Deutsche Kultur"' : isCs ? 'Np. "Praha", "Svíčková" lub "Česká kultura"' : isRu ? 'Np. "Moskwa", "Balet" lub "Kultura rosyjska"' : 'Np. "greetings", "food" lub "British culture"') : isEn ? 'E.g. "Greetings", "Food" or "British culture"' : isFr ? 'Ex. "Cuisine", "Paris" ou "Culture française"' : isEs ? 'Ej. "Tapas", "Madrid" o "Cultura española"' : isDe ? 'Z.B. "Brot", "Berlin" oder "Deutsche Kultur"' : isCs ? 'Např. "Praha", "Svíčková" nebo "Česká kultura"' : isRu ? 'Напр. "Москва", "Балет" или "Русская культура"' : 'Es. "Pizza", "Roma" o "Venezia"',
+    noResults:    (q: string) => l === 'pl' ? `Brak wyników dla "${q}"` : isEn ? `No results for "${q}"` : isFr ? `Aucun résultat pour "${q}"` : isEs ? `Sin resultados para "${q}"` : isDe ? `Keine Ergebnisse für "${q}"` : isCs ? `Žádné výsledky pro "${q}"` : isRu ? `Нет результатов для "${q}"` : `Nessun risultato per "${q}"`,
+    langToggle:   l === 'pl' ? 'Zmień język' : isEn ? 'Change language' : isFr ? 'Changer de langue' : isEs ? 'Cambiar idioma' : isDe ? 'Sprache wechseln' : isCs ? 'Změnit jazyk' : isRu ? 'Изменить язык' : 'Cambia lingua',
+    apiKey:       l === 'pl' ? 'Zmień klucz API' : isEn ? 'Change API key' : isFr ? 'Changer la clé API' : isEs ? 'Cambiar clave API' : isDe ? 'API-Schlüssel ändern' : isCs ? 'Změnit API klíč' : isRu ? 'Изменить API ключ' : 'Cambia chiave API',
+    backToHome:   l === 'pl' ? 'Zmień tryb' : isEn ? 'Change mode' : isFr ? 'Changer de mode' : isEs ? 'Cambiar modo' : isDe ? 'Modus wechseln' : isCs ? 'Změnit režim' : isRu ? 'Изменить режим' : 'Cambia modalità',
   };
 
   return (
@@ -989,7 +992,7 @@ const AppInner: React.FC<{
 
                     {/* Language flag */}
                     {job.targetLang && (
-                      <span className="shrink-0 opacity-70" title={job.targetLang === 'it' ? 'Włoski' : job.targetLang === 'en' ? 'Angielski' : job.targetLang === 'fr' ? 'Francuski' : job.targetLang === 'es' ? 'Hiszpański' : job.targetLang === 'de' ? 'Niemiecki' : job.targetLang === 'cs' ? 'Czeski' : ''}>
+                      <span className="shrink-0 opacity-70" title={job.targetLang === 'it' ? 'Włoski' : job.targetLang === 'en' ? 'Angielski' : job.targetLang === 'fr' ? 'Francuski' : job.targetLang === 'es' ? 'Hiszpański' : job.targetLang === 'de' ? 'Niemiecki' : job.targetLang === 'cs' ? 'Czeski' : job.targetLang === 'ru' ? 'Rosyjski' : ''}>
                         <Flag code={job.targetLang} size={12} />
                       </span>
                     )}
@@ -1127,7 +1130,7 @@ const AppInner: React.FC<{
                   >
                     {d}
                     <span className="ml-1 opacity-70 font-normal text-[9px]">
-                      {DIFF_LABELS[d]?.[l === 'pl' ? 'pl' : isEn ? 'en' : isFr ? 'fr' : isEs ? 'es' : isDe ? 'de' : isCs ? 'cs' : 'it'] ?? ''}
+                      {DIFF_LABELS[d]?.[l === 'pl' ? 'pl' : isEn ? 'en' : isFr ? 'fr' : isEs ? 'es' : isDe ? 'de' : isCs ? 'cs' : isRu ? 'ru' : 'it'] ?? ''}
                     </span>
                   </button>
                 ))}
@@ -1137,7 +1140,7 @@ const AppInner: React.FC<{
             {!historyLoaded ? (
               <div className="text-center py-12 text-xs animate-pulse" style={{ color: 'var(--c-faint)' }}>
                 <SparklesIcon className="w-4 h-4 mx-auto mb-2" style={{ color: 'var(--c-green)' }} />
-                {l === 'pl' ? 'Wczytywanie biblioteki…' : l === 'en' ? 'Loading library…' : l === 'fr' ? 'Chargement de la bibliothèque…' : l === 'es' ? 'Cargando biblioteca…' : l === 'de' ? 'Bibliothek wird geladen…' : l === 'cs' ? 'Načítání knihovny…' : 'Caricamento biblioteca…'}
+                {l === 'pl' ? 'Wczytywanie biblioteki…' : l === 'en' ? 'Loading library…' : l === 'fr' ? 'Chargement de la bibliothèque…' : l === 'es' ? 'Cargando biblioteca…' : l === 'de' ? 'Bibliothek wird geladen…' : l === 'cs' ? 'Načítání knihovny…' : l === 'ru' ? 'Загрузка библиотеки…' : 'Caricamento biblioteca…'}
               </div>
             ) : history.filter(les => (les.targetLang ?? 'it') === targetLang).length === 0 ? (
               <div className="text-center py-16 rounded-2xl border-2 border-dashed space-y-1.5"
@@ -1234,9 +1237,9 @@ const AppInner: React.FC<{
           </span>
           {filteredHistory.length > 0 && (
             <div className="flex items-center gap-2 text-[10px]">
-              <span style={{ color: 'var(--c-faint)' }}>{l === 'pl' ? 'Skróty:' : l === 'en' ? 'Shortcuts:' : l === 'fr' ? 'Raccourcis :' : l === 'es' ? 'Atajos:' : l === 'de' ? 'Tastenkürzel:' : l === 'cs' ? 'Zkratky:' : 'Scorciatoie:'}</span>
-              <span className="kbd">/</span><span>{l === 'pl' ? 'szukaj' : l === 'en' ? 'search' : l === 'fr' ? 'chercher' : l === 'es' ? 'buscar' : l === 'de' ? 'suchen' : l === 'cs' ? 'hledat' : 'cerca'}</span>
-              <span className="kbd">R</span><span>{l === 'pl' ? 'losowa' : l === 'en' ? 'random' : l === 'fr' ? 'aléatoire' : l === 'es' ? 'aleatorio' : l === 'de' ? 'zufällig' : l === 'cs' ? 'náhodný' : 'casuale'}</span>
+              <span style={{ color: 'var(--c-faint)' }}>{l === 'pl' ? 'Skróty:' : l === 'en' ? 'Shortcuts:' : l === 'fr' ? 'Raccourcis :' : l === 'es' ? 'Atajos:' : l === 'de' ? 'Tastenkürzel:' : l === 'cs' ? 'Zkratky:' : l === 'ru' ? 'Ярлыки:' : 'Scorciatoie:'}</span>
+              <span className="kbd">/</span><span>{l === 'pl' ? 'szukaj' : l === 'en' ? 'search' : l === 'fr' ? 'chercher' : l === 'es' ? 'buscar' : l === 'de' ? 'suchen' : l === 'cs' ? 'hledat' : l === 'ru' ? 'поиск' : 'cerca'}</span>
+              <span className="kbd">R</span><span>{l === 'pl' ? 'losowa' : l === 'en' ? 'random' : l === 'fr' ? 'aléatoire' : l === 'es' ? 'aleatorio' : l === 'de' ? 'zufällig' : l === 'cs' ? 'náhodný' : l === 'ru' ? 'случайная' : 'casuale'}</span>
             </div>
           )}
         </div>
@@ -1355,6 +1358,21 @@ const HomeScreen: React.FC<{ onSelect: (lang: TargetLang) => void }> = ({ onSele
             Wybierz →
           </span>
         </button>
+
+        {/* Rosyjski */}
+        <button
+          onClick={() => onSelect('ru')}
+          className="group card card-hover p-6 flex flex-col items-center gap-3 transition-all"
+        >
+          <Flag code="ru" size={48} />
+          <div className="text-center">
+            <p className="font-serif font-bold text-lg" style={{ color: 'var(--c-text)' }}>Rosyjski</p>
+            <p className="text-xs mt-0.5" style={{ color: 'var(--c-muted)' }}>Polsko-rosyjski</p>
+          </div>
+          <span className="text-xs font-semibold group-hover:translate-x-1 transition-transform" style={{ color: 'var(--c-green)' }}>
+            Wybierz →
+          </span>
+        </button>
       </div>
     </div>
   );
@@ -1367,7 +1385,7 @@ const App: React.FC = () => {
   const [showKeyModal, setShowKeyModal] = useState(false);
   const [targetLang, setTargetLang] = useState<TargetLang | null>(() => {
     const saved = localStorage.getItem(APP_MODE_KEY) as TargetLang | null;
-    return saved === 'it' || saved === 'en' || saved === 'fr' || saved === 'es' || saved === 'de' || saved === 'cs' ? saved : null;
+    return saved === 'it' || saved === 'en' || saved === 'fr' || saved === 'es' || saved === 'de' || saved === 'cs' || saved === 'ru' ? saved : null;
   });
 
   const saveApiKey = (key: string) => {
