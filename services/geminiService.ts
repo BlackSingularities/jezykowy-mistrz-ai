@@ -1710,3 +1710,225 @@ CRITICAL: Respond with ONLY a raw JSON object:
     return [];
   }
 }
+
+// ─── Czech Lesson Generation ──────────────────────────────────────────────────
+
+export const generateCzechLesson = async (topic: string, apiKey: string, model?: string): Promise<Lesson> => {
+  const client = new OpenAI({
+    baseURL: "https://openrouter.ai/api/v1",
+    apiKey,
+    dangerouslyAllowBrowser: true,
+  });
+
+  const response = await client.chat.completions.create({
+    model: model || getSavedModel() || DEFAULT_MODEL,
+    messages: [
+      {
+        role: "system",
+        content: `You are a world-class bilingual (Czech/Polish) editorial expert, cultural authority, and master language educator with 30 years of experience teaching Czech to Polish speakers.
+
+You produce premium, literary-quality learning resources that feel like an issue of a prestigious culture magazine combined with a rigorous academic reference.
+
+Your guiding principles:
+— DEPTH over brevity: every field must be thorough, substantive, and information-dense. Short answers are a failure.
+— CULTURAL AUTHENTICITY: Czech-speaking world is diverse — mention Bohemia, Moravia, Silesia, and Slovak connections where relevant. Reference Czech history, literature, music, and cuisine with authority.
+— LINGUISTIC PRECISION: distinguish registers, connotations, and pragmatic constraints scrupulously. Pay special attention to Czech aspect pairs (perfective/imperfective), declension, and the soft/hard consonant distinction.
+— POLISH SPEAKER FOCUS: always identify specifically which Polish structures or words cause interference. Note where Czech and Polish are close (Slavic cognates) and where they diverge (false friends such as "čerstvý" vs. "czerstwy", "hrozný" vs. "groźny", "zápach" vs. "zapach"). The Czech letter "ř", vowel length marks (á/é/í/ó/ú/ů), and verbal aspects are key challenges.
+— LITERARY QUALITY: your Czech must be native, varied, and beautiful. Your Polish must be elegant and precise.
+— MEMORABILITY: every explanation, example, and note should be crafted so a learner will never forget it.
+
+CRITICAL LENGTH REQUIREMENTS — enforce these strictly:
+• introduction: ≥ 6 sentences per language
+• vocabulary definitions: ≥ 2–3 sentences per language each
+• grammar explanations: ≥ 5 sentences per language each
+• grammar examples: ≥ 4 example pairs per grammar point
+• common_mistakes explanations: ≥ 3–4 sentences per language each
+
+• deep_dive: ≥ 250 words per language — in-depth analytical/narrative feature
+• culture content: ≥ 250 words per language
+• cultural_notes content: ≥ 3 sentences per language each
+• mini_story text: ≥ 200 words per language
+• dialogue: ≥ 16 lines total, each utterance 1–3 sentences
+• closing_reflection: ≥ 200 words per language — synthesising closing essay
+• proverb meaning: ≥ 4 sentences per language
+• idiom meaning + origin: ≥ 3 sentences each per language
+
+IMPORTANT: All bilingual fields use "cs" (not "it", "en", "fr", "es", or "de") for the Czech content, and "pl" for Polish.
+DO NOT produce shortened, telegraphic, or bullet-point-style content in any field that requests prose.`,
+      },
+      {
+        role: "user",
+        content: `Create a comprehensive, premium bilingual (Czech–Polish) learning resource on the topic: "${topic}".
+
+Target audience: Polish adults learning Czech (B1–B2 level).
+Tone: Engaging, magazine-quality, culturally immersive, intellectually serious.
+
+MANDATORY requirements — failure to meet ANY of these is unacceptable:
+1. ALL prose fields must be long and substantive.
+2. ALL explanations and prose must be provided in BOTH Czech and Polish — every "Bilingual" field has "cs" and "pl" keys (NOT "it", "en", "fr", "es", or "de").
+3. DO NOT include a "vocabulary" field — vocabulary is generated separately.
+4. Grammar: 3 sections minimum, each with ≥ 5-sentence explanations and ≥ 4 example pairs. Focus on Czech-specific structures (aspect pairs, declension cases, verbal prefixes, word order, negation with genitive).
+5. Common mistakes: SPECIFIC to Polish speakers — name the Polish word causing interference, especially Czech-Polish false friends ("čerstvý"/"czerstwy", "hrozný"/"groźny", "zápach"/"zapach", etc.). ≥ 5 mistakes total.
+6. Mini-story: ≥ 200 words per language, literary quality, named characters set in Czech Republic (Praha, Brno, Český Krumlov, etc.).
+7. Dialogue: ≥ 16 lines, authentic native Czech, multi-sentence utterances, grammar notes on ≥ 6 lines.
+8. Culture content: ≥ 250 words per language — historical depth, regional specifics, contemporary relevance (Bohemia vs. Moravia perspective where relevant, Czech national identity, Hussite heritage, Kafka, Dvořák, etc.).
+9. Cultural notes: 3–4 notes, each ≥ 3 sentences per language.
+10. Proverb: must be a REAL Czech proverb (přísloví). Meaning field ≥ 4 sentences per language.
+11. Idiom: genuine Czech idiom (idiom/rčení). Origin story required (≥ 3 sentences per language).
+12. Phrases: 8 items, each with detailed context ≥ 2–3 sentences per language.
+13. deep_dive_title: concise encyclopedic section title (3–7 words). deep_dive: ≥ 250 words per language — authoritative, encyclopedic analysis. NO "lesson/journey" framing.
+14. closing_reflection_title: concise encyclopedic section title. closing_reflection: ≥ 200 words per language — scholarly synthesis. NO "lesson/journey" framing.
+
+CRITICAL — You MUST respond with a single valid JSON object. No markdown, no code fences, no extra text — ONLY the raw JSON.
+
+Use "cs" key (not "it", "en", "fr", "es", or "de") for Czech content in all Bilingual fields. Do NOT include a "vocabulary" field:
+{
+  "topic": {"cs": "...", "pl": "..."},
+  "subtitle": {"cs": "...", "pl": "..."},
+  "emoji": "🇨🇿",
+  "tags": ["tag1", "tag2", "tag3"],
+  "difficulty_level": "B1",
+  "estimated_reading_minutes": 12,
+  "introduction": {"cs": "...", "pl": "..."},
+  "key_takeaways": [{"cs": "...", "pl": "..."}, {"cs": "...", "pl": "..."}, {"cs": "...", "pl": "..."}],
+  "trivia": {"cs": "...", "pl": "..."},
+  "regional_notes": {"cs": "...", "pl": "..."},
+  "deep_dive_title": {"cs": "...", "pl": "..."},
+  "deep_dive": {"cs": "...", "pl": "..."},
+  "grammar": [...],
+  "common_mistakes": [...],
+  "useful_phrases": [...],
+  "mini_story": {"title": {"cs": "...", "pl": "..."}, "text": {"cs": "...", "pl": "..."}, "moral": {"cs": "...", "pl": "..."}},
+  "dialogue": {"title": {"cs": "...", "pl": "..."}, "setting": {"cs": "...", "pl": "..."}, "lines": [...], "vocabulary_highlight": ["..."]},
+  "closing_reflection_title": {"cs": "...", "pl": "..."},
+  "closing_reflection": {"cs": "...", "pl": "..."},
+  "culture": {"title": {"cs": "...", "pl": "..."}, "content": {"cs": "...", "pl": "..."}, "did_you_know": {"cs": "...", "pl": "..."}},
+  "cultural_notes": [{"icon": "🏰", "title": {"cs": "...", "pl": "..."}, "content": {"cs": "...", "pl": "..."}, "region": "..."}],
+  "proverb": {"text": "...", "translation": {"cs": "...", "pl": "..."}, "meaning": {"cs": "...", "pl": "..."}},
+  "idiom": {"phrase": "...", "literal": {"cs": "...", "pl": "..."}, "meaning": {"cs": "...", "pl": "..."}, "origin": {"cs": "...", "pl": "..."}, "example_sentence": {"cs": "...", "pl": "..."}}
+}
+
+Remember: this resource must be so good that a learner could use it as their primary reference for this topic.`,
+      },
+    ],
+    response_format: { type: "json_object" },
+    // OpenRouter extensions: heal malformed JSON; route only to JSON-capable providers
+    plugins: [{ id: "response-healing" }],
+    provider: { require_parameters: true },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  } as any);
+
+  const czechText = response.choices[0]?.message?.content;
+  if (!czechText) throw new Error("Empty response from API");
+
+  const data = tryParseJSON(czechText);
+
+  // Validate required fields
+  const REQUIRED = ['topic','subtitle','emoji','tags','difficulty_level','introduction','key_takeaways','grammar','common_mistakes','useful_phrases','mini_story','dialogue','closing_reflection','culture','cultural_notes','proverb','idiom'];
+  const missing = findMissingRequiredFields(data, REQUIRED);
+  if (missing.length > 0) {
+    throw new Error(`Incomplete lesson JSON — missing fields: ${missing.join(', ')}`);
+  }
+
+  // Normalize difficulty level to single CEFR code
+  data.difficulty_level = normalizeDifficultyLevel(data.difficulty_level);
+
+  // Generate vocabulary as a separate request with full lesson context
+  const vocabulary = await generateCzechVocabulary(data, apiKey, model || getSavedModel() || DEFAULT_MODEL, client);
+
+  return {
+    ...data,
+    vocabulary,
+    id: typeof crypto !== "undefined" && crypto.randomUUID
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+    timestamp: Date.now(),
+    targetLang: 'cs' as const,
+  } as Lesson;
+};
+
+// ─── Czech Vocabulary Generation ─────────────────────────────────────────────
+
+async function generateCzechVocabulary(
+  lessonData: Record<string, unknown>,
+  apiKey: string,
+  model: string,
+  client?: OpenAI
+): Promise<import('../types').VocabularyItem[]> {
+  const c = client ?? new OpenAI({ baseURL: "https://openrouter.ai/api/v1", apiKey, dangerouslyAllowBrowser: true });
+
+  const lessonSummary = JSON.stringify({
+    topic: lessonData.topic,
+    tags: lessonData.tags,
+    difficulty_level: lessonData.difficulty_level,
+    introduction: lessonData.introduction,
+    deep_dive: lessonData.deep_dive,
+    grammar: lessonData.grammar,
+    mini_story: lessonData.mini_story,
+    dialogue: lessonData.dialogue,
+  });
+
+  const response = await c.chat.completions.create({
+    model,
+    messages: [
+      {
+        role: "system",
+        content: `You are a specialist Czech lexicographer and vocabulary teacher for Polish speakers. You create precise, detailed, encyclopedic vocabulary entries for language learners. Your entries are accurate, pedagogically rich, and directly relevant to the topic at hand. Pay special attention to Czech noun genders (masculine animate/inanimate, feminine, neuter), aspect pairs (imperfective/perfective), and the characteristic Czech sounds (ř, č, š, ž, long vowels á/é/í/ó/ú/ů).`,
+      },
+      {
+        role: "user",
+        content: `Based on the following Czech lesson content, generate a vocabulary list of EXACTLY 15 to 25 items (no fewer than 15, no more than 25). Choose the most important, topic-relevant Czech words and phrases — a mix of nouns, verbs, adjectives, adverbs, and set phrases.
+
+LESSON CONTENT:
+${lessonSummary}
+
+For each vocabulary item provide:
+- word: the Czech word/phrase (for nouns include gender hint in brackets if helpful, e.g. "ten/ta/to")
+- ipa: full IPA phonetic transcription
+- gender: "m" (masculine animate/inanimate), "f" (feminine), or "pl" for plural nouns; use "invariant" for neuter nouns and for verbs/adjectives/adverbs
+- plural: plural form (for nouns)
+- part_of_speech: one of noun|verb|adjective|adverb|phrase|interjection|conjunction|preposition
+- register: one of formal|informal|colloquial|literary|regional|vulgar
+- translation: Polish translation
+- definition: {"cs": "2-3 sentence definition in Czech", "pl": "2-3 sentence definition in Polish"}
+- context_sentence: {"cs": "A vivid Czech example sentence", "pl": "Polish translation"}
+- audio_hint: pronunciation tip for Polish speakers (e.g. Czech ř sound, long vowels, háček letters č/š/ž, soft/hard consonants, word stress always on first syllable)
+- etymology: {"cs": "etymology in Czech", "pl": "etymology in Polish"}
+- synonyms: array of 3-4 Czech synonyms
+- antonyms: array of 2-3 Czech antonyms
+- word_family: array of 3-4 related forms: [{"form": "...", "type": "...", "translation": "..."}]
+
+CRITICAL: Respond with ONLY a raw JSON object:
+{
+  "vocabulary": [
+    {
+      "word": "...", "ipa": "...", "gender": "m|f|pl|invariant", "plural": "...",
+      "part_of_speech": "noun|verb|...", "register": "formal|informal|...",
+      "translation": "...",
+      "definition": {"cs": "...", "pl": "..."},
+      "context_sentence": {"cs": "...", "pl": "..."},
+      "audio_hint": "...",
+      "etymology": {"cs": "...", "pl": "..."},
+      "synonyms": ["...", "..."], "antonyms": ["...", "..."],
+      "word_family": [{"form": "...", "type": "...", "translation": "..."}]
+    }
+  ]
+}`,
+      },
+    ],
+    response_format: { type: "json_object" },
+    // OpenRouter extensions: heal malformed JSON; route only to JSON-capable providers
+    plugins: [{ id: "response-healing" }],
+    provider: { require_parameters: true },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  } as any);
+
+  const vocabText = response.choices[0]?.message?.content;
+  if (!vocabText) return [];
+  try {
+    const parsed = JSON.parse(vocabText);
+    return parsed.vocabulary ?? [];
+  } catch {
+    return [];
+  }
+}
