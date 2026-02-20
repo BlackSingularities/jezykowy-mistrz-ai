@@ -37,8 +37,8 @@ interface QueueItem {
 }
 
 const API_KEY_STORAGE = 'openrouter_api_key';
-const HISTORY_KEY    = 'italian_app_history'; // localStorage fallback key
-const APP_MODE_KEY   = 'app_mode'; // 'it' | 'en'
+const HISTORY_KEY = 'italian_app_history'; // localStorage fallback key
+const APP_MODE_KEY = 'app_mode'; // 'it' | 'en'
 
 // ─── History persistence: osobne pliki ───────────────────────────────────────
 
@@ -101,11 +101,11 @@ const DIFF_GRADIENT: Record<string, string> = {
 };
 
 const DIFF_LABELS: Record<string, { pl: string; it: string; en: string; fr: string; es: string; de: string }> = {
-  A1: { pl: 'Początkujący',        it: 'Principiante',    en: 'Beginner',           fr: 'Débutant',           es: 'Principiante',    de: 'Anfänger'        },
-  A2: { pl: 'Elementarny',         it: 'Elementare',      en: 'Elementary',         fr: 'Élémentaire',        es: 'Elemental',       de: 'Grundkenntnisse' },
-  B1: { pl: 'Średniozaawansowany', it: 'Intermedio',      en: 'Intermediate',       fr: 'Intermédiaire',      es: 'Intermedio',      de: 'Mittelstufe'     },
-  B2: { pl: 'Wyższy średni',       it: 'Intermedio sup.', en: 'Upper-Intermediate', fr: 'Interm. supérieur',  es: 'Interm. superior',de: 'Gute Mittelstufe'},
-  C1: { pl: 'Zaawansowany',        it: 'Avanzato',        en: 'Advanced',           fr: 'Avancé',             es: 'Avanzado',        de: 'Fortgeschritten' },
+  A1: { pl: 'Początkujący', it: 'Principiante', en: 'Beginner', fr: 'Débutant', es: 'Principiante', de: 'Anfänger' },
+  A2: { pl: 'Elementarny', it: 'Elementare', en: 'Elementary', fr: 'Élémentaire', es: 'Elemental', de: 'Grundkenntnisse' },
+  B1: { pl: 'Średniozaawansowany', it: 'Intermedio', en: 'Intermediate', fr: 'Intermédiaire', es: 'Intermedio', de: 'Mittelstufe' },
+  B2: { pl: 'Wyższy średni', it: 'Intermedio sup.', en: 'Upper-Intermediate', fr: 'Interm. supérieur', es: 'Interm. superior', de: 'Gute Mittelstufe' },
+  C1: { pl: 'Zaawansowany', it: 'Avanzato', en: 'Advanced', fr: 'Avancé', es: 'Avanzado', de: 'Fortgeschritten' },
 };
 
 // ─── ModelPicker ──────────────────────────────────────────────────────────────
@@ -151,9 +151,9 @@ const ModelPicker: React.FC<{
 
   const filtered = query.trim()
     ? models.filter(m =>
-        m.id.toLowerCase().includes(query.toLowerCase()) ||
-        m.name.toLowerCase().includes(query.toLowerCase())
-      )
+      m.id.toLowerCase().includes(query.toLowerCase()) ||
+      m.name.toLowerCase().includes(query.toLowerCase())
+    )
     : models;
 
   const shortName = (id: string) => id.split('/').pop() ?? id;
@@ -162,7 +162,7 @@ const ModelPicker: React.FC<{
     <div ref={ref} className="relative">
       <button
         onClick={openPicker}
-        className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all active:scale-95 border"
+        className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all border"
         style={{
           background: 'var(--c-surface)',
           borderColor: 'var(--c-border)',
@@ -435,7 +435,7 @@ const LessonCard: React.FC<{
             </span>
           )}
         </div>
-        <span className="font-semibold group-hover:translate-x-1 transition-transform" style={{ color: 'var(--c-green)' }}>
+        <span className="font-semibold" style={{ color: 'var(--c-green)' }}>
           {lang === 'pl' ? 'Czytaj →' : lang === 'en' ? 'Read →' : lang === 'fr' ? 'Lire →' : lang === 'es' ? 'Leer →' : lang === 'de' ? 'Lesen →' : 'Leggi →'}
         </span>
       </div>
@@ -670,7 +670,7 @@ const AppInner: React.FC<{
     if (job?.status === 'running') return;
     setQueue(prev => prev.filter(j => j.qid !== qid));
     if (!qid.startsWith('tmp-')) {
-      await fetch(`/api/jobs/${qid}`, { method: 'DELETE' }).catch(() => {});
+      await fetch(`/api/jobs/${qid}`, { method: 'DELETE' }).catch(() => { });
     }
   };
 
@@ -678,7 +678,7 @@ const AppInner: React.FC<{
     setQueue(prev => prev.map(j =>
       j.qid === qid ? { ...j, status: 'pending' as QueueStatus, error: undefined } : j
     ));
-    await fetch(`/api/jobs/${qid}/retry`, { method: 'POST' }).catch(() => {});
+    await fetch(`/api/jobs/${qid}/retry`, { method: 'POST' }).catch(() => { });
   };
 
   const clearFinished = async () => {
@@ -782,20 +782,26 @@ const AppInner: React.FC<{
   const isIt = targetLang === 'it';
   const isEn = targetLang === 'en';
   const isFr = targetLang === 'fr';
+  // Nazwa aplikacji zależna od wybranego języka docelowego
+  const langName = targetLang === 'en' ? 'Angielski' : targetLang === 'fr' ? 'Francuski' : targetLang === 'es' ? 'Hiszpański' : targetLang === 'de' ? 'Niemiecki' : 'Włoski';
+  const langNameEn = targetLang === 'it' ? 'Italian' : targetLang === 'fr' ? 'French' : targetLang === 'es' ? 'Spanish' : targetLang === 'de' ? 'German' : 'English';
+  const langNameFr = targetLang === 'it' ? 'Italien' : targetLang === 'en' ? 'Anglais' : targetLang === 'es' ? 'Espagnol' : targetLang === 'de' ? 'Allemand' : 'Français';
+  const langNameEs = targetLang === 'it' ? 'Italiano' : targetLang === 'en' ? 'Inglés' : targetLang === 'fr' ? 'Francés' : targetLang === 'de' ? 'Alemán' : 'Español';
+  const langNameDe = targetLang === 'it' ? 'Italienisch' : targetLang === 'en' ? 'Englisch' : targetLang === 'fr' ? 'Französisch' : targetLang === 'es' ? 'Spanisch' : 'Deutsch';
   const L = {
-    appName:      l === 'pl' ? 'Językowy Mistrz AI' : isEn ? 'Language Master AI' : isFr ? 'Maître Linguistique IA' : isEs ? 'Maestro de Idiomas IA' : isDe ? 'Sprachmeister KI' : 'Maestro Linguistico AI',
-    headline:     l === 'pl' ? 'O czym chcesz dzisiaj poczytać?' : isEn ? 'What do you want to read about today?' : isFr ? "De quoi voulez-vous lire aujourd'hui ?" : isEs ? '¿Sobre qué quieres leer hoy?' : isDe ? 'Worüber möchten Sie heute lesen?' : 'Di cosa vuoi leggere oggi?',
-    subtitle:     l === 'pl' ? 'Twórz artykuły, lekcje i opracowania kulturowe z AI.' : isEn ? 'Create articles, lessons and cultural insights with AI.' : isFr ? "Créez des articles, des leçons et des analyses culturelles avec l'IA." : isEs ? 'Crea artículos, lecciones y análisis culturales con IA.' : isDe ? 'Erstellen Sie Artikel, Lektionen und Kulturanalysen mit KI.' : "Crea articoli, lezioni e approfondimenti culturali con l'AI.",
-    placeholder:  l === 'pl' ? 'Temat… (kilka linii = kilka artykułów równolegle)' : isEn ? 'Topic… (multiple lines = parallel articles)' : isFr ? 'Sujet… (plusieurs lignes = plusieurs articles en parallèle)' : isEs ? 'Tema… (varias líneas = varios artículos en paralelo)' : isDe ? 'Thema… (mehrere Zeilen = mehrere Artikel parallel)' : 'Argomento… (più righe = più articoli in parallelo)',
-    generating:   l === 'pl' ? 'Generowanie — to może chwilę zająć…' : isEn ? 'Generating — this may take a moment…' : isFr ? 'Génération en cours…' : isEs ? 'Generando…' : isDe ? 'Wird generiert…' : 'Generazione in corso…',
+    appName: l === 'pl' ? `${langName} Mistrz AI` : isEn ? `${langNameEn} Master AI` : isFr ? `Maître ${langNameFr} IA` : isEs ? `Maestro de ${langNameEs} IA` : isDe ? `${langNameDe} Meister KI` : `Maestro di ${targetLang === 'it' ? 'Italiano' : targetLang === 'fr' ? 'Francese' : targetLang === 'es' ? 'Spagnolo' : targetLang === 'de' ? 'Tedesco' : 'Inglese'} AI`,
+    headline: l === 'pl' ? 'O czym chcesz dzisiaj poczytać?' : isEn ? 'What do you want to read about today?' : isFr ? "De quoi voulez-vous lire aujourd'hui ?" : isEs ? '¿Sobre qué quieres leer hoy?' : isDe ? 'Worüber möchten Sie heute lesen?' : 'Di cosa vuoi leggere oggi?',
+    subtitle: l === 'pl' ? 'Twórz artykuły, lekcje i opracowania kulturowe z AI.' : isEn ? 'Create articles, lessons and cultural insights with AI.' : isFr ? "Créez des articles, des leçons et des analyses culturelles avec l'IA." : isEs ? 'Crea artículos, lecciones y análisis culturales con IA.' : isDe ? 'Erstellen Sie Artikel, Lektionen und Kulturanalysen mit KI.' : "Crea articoli, lezioni e approfondimenti culturali con l'AI.",
+    placeholder: l === 'pl' ? 'Temat… (kilka linii = kilka artykułów równolegle)' : isEn ? 'Topic… (multiple lines = parallel articles)' : isFr ? 'Sujet… (plusieurs lignes = plusieurs articles en parallèle)' : isEs ? 'Tema… (varias líneas = varios artículos en paralelo)' : isDe ? 'Thema… (mehrere Zeilen = mehrere Artikel parallel)' : 'Argomento… (più righe = più articoli in parallelo)',
+    generating: l === 'pl' ? 'Generowanie — to może chwilę zająć…' : isEn ? 'Generating — this may take a moment…' : isFr ? 'Génération en cours…' : isEs ? 'Generando…' : isDe ? 'Wird generiert…' : 'Generazione in corso…',
     yourArticles: l === 'pl' ? 'Twoje artykuły' : isEn ? 'Your articles' : isFr ? 'Vos articles' : isEs ? 'Tus artículos' : isDe ? 'Ihre Artikel' : 'I tuoi articoli',
-    search:       l === 'pl' ? 'Szukaj…' : isEn ? 'Search…' : isFr ? 'Rechercher…' : isEs ? 'Buscar…' : isDe ? 'Suchen…' : 'Cerca…',
-    noArticles:   l === 'pl' ? 'Brak artykułów. Stwórz swój pierwszy!' : isEn ? 'No articles yet. Create your first!' : isFr ? 'Pas encore d\'articles. Créez le vôtre !' : isEs ? '¡Sin artículos. ¡Crea el primero!' : isDe ? 'Keine Artikel. Erstellen Sie Ihren ersten!' : 'Nessun articolo. Crea il tuo primo!',
-    noArticlesSub:l === 'pl' ? (isIt ? 'Np. "Pizza", "Rzym" lub "Wenecja"' : isFr ? 'Np. "Cuisine", "Paris" lub "Culture française"' : isEs ? 'Np. "Tapas", "Madrid" lub "Cultura española"' : isDe ? 'Z.B. "Brot", "Berlin" oder "Deutsche Kultur"' : 'Np. "greetings", "food" lub "British culture"') : isEn ? 'E.g. "Greetings", "Food" or "British culture"' : isFr ? 'Ex. "Cuisine", "Paris" ou "Culture française"' : isEs ? 'Ej. "Tapas", "Madrid" o "Cultura española"' : isDe ? 'Z.B. "Brot", "Berlin" oder "Deutsche Kultur"' : 'Es. "Pizza", "Roma" o "Venezia"',
-    noResults:    (q: string) => l === 'pl' ? `Brak wyników dla "${q}"` : isEn ? `No results for "${q}"` : isFr ? `Aucun résultat pour "${q}"` : isEs ? `Sin resultados para "${q}"` : isDe ? `Keine Ergebnisse für "${q}"` : `Nessun risultato per "${q}"`,
-    langToggle:   l === 'pl' ? 'Zmień język' : isEn ? 'Change language' : isFr ? 'Changer de langue' : isEs ? 'Cambiar idioma' : isDe ? 'Sprache wechseln' : 'Cambia lingua',
-    apiKey:       l === 'pl' ? 'Zmień klucz API' : isEn ? 'Change API key' : isFr ? 'Changer la clé API' : isEs ? 'Cambiar clave API' : isDe ? 'API-Schlüssel ändern' : 'Cambia chiave API',
-    backToHome:   l === 'pl' ? 'Zmień tryb' : isEn ? 'Change mode' : isFr ? 'Changer de mode' : isEs ? 'Cambiar modo' : isDe ? 'Modus wechseln' : 'Cambia modalità',
+    search: l === 'pl' ? 'Szukaj…' : isEn ? 'Search…' : isFr ? 'Rechercher…' : isEs ? 'Buscar…' : isDe ? 'Suchen…' : 'Cerca…',
+    noArticles: l === 'pl' ? 'Brak artykułów. Stwórz swój pierwszy!' : isEn ? 'No articles yet. Create your first!' : isFr ? 'Pas encore d\'articles. Créez le vôtre !' : isEs ? '¡Sin artículos. ¡Crea el primero!' : isDe ? 'Keine Artikel. Erstellen Sie Ihren ersten!' : 'Nessun articolo. Crea il tuo primo!',
+    noArticlesSub: l === 'pl' ? (isIt ? 'Np. "Pizza", "Rzym" lub "Wenecja"' : isFr ? 'Np. "Cuisine", "Paris" lub "Culture française"' : isEs ? 'Np. "Tapas", "Madrid" lub "Cultura española"' : isDe ? 'Z.B. "Brot", "Berlin" oder "Deutsche Kultur"' : 'Np. "greetings", "food" lub "British culture"') : isEn ? 'E.g. "Greetings", "Food" or "British culture"' : isFr ? 'Ex. "Cuisine", "Paris" ou "Culture française"' : isEs ? 'Ej. "Tapas", "Madrid" o "Cultura española"' : isDe ? 'Z.B. "Brot", "Berlin" oder "Deutsche Kultur"' : 'Es. "Pizza", "Roma" o "Venezia"',
+    noResults: (q: string) => l === 'pl' ? `Brak wyników dla "${q}"` : isEn ? `No results for "${q}"` : isFr ? `Aucun résultat pour "${q}"` : isEs ? `Sin resultados para "${q}"` : isDe ? `Keine Ergebnisse für "${q}"` : `Nessun risultato per "${q}"`,
+    langToggle: l === 'pl' ? 'Zmień język' : isEn ? 'Change language' : isFr ? 'Changer de langue' : isEs ? 'Cambiar idioma' : isDe ? 'Sprache wechseln' : 'Cambia lingua',
+    apiKey: l === 'pl' ? 'Zmień klucz API' : isEn ? 'Change API key' : isFr ? 'Changer la clé API' : isEs ? 'Cambiar clave API' : isDe ? 'API-Schlüssel ändern' : 'Cambia chiave API',
+    backToHome: l === 'pl' ? 'Zmień tryb' : isEn ? 'Change mode' : isFr ? 'Changer de mode' : isEs ? 'Cambiar modo' : isDe ? 'Modus wechseln' : 'Cambia modalità',
   };
 
   return (
@@ -913,7 +919,7 @@ const AppInner: React.FC<{
                 <button
                   type="submit"
                   disabled={!input.trim()}
-                  className="absolute right-2 bottom-2 p-2 rounded-lg transition-all active:scale-95 disabled:opacity-40"
+                  className="absolute right-2 bottom-2 p-2 rounded-lg transition-all disabled:opacity-40"
                   style={{ background: 'var(--c-text)', color: '#fff' }}
                   title={l === 'pl' ? 'Dodaj do kolejki (Enter)' : l === 'en' ? 'Add to queue (Enter)' : l === 'fr' ? 'Ajouter à la file (Entrée)' : l === 'es' ? 'Añadir a la cola (Enter)' : 'Aggiungi alla coda (Enter)'}
                 >
@@ -925,17 +931,17 @@ const AppInner: React.FC<{
                   ? (l === 'pl'
                     ? `${input.split('\n').filter(t => t.trim()).length} tematów — Enter by dodać wszystkie`
                     : l === 'en'
-                    ? `${input.split('\n').filter(t => t.trim()).length} topics — Enter to add all`
-                    : l === 'fr'
-                    ? `${input.split('\n').filter(t => t.trim()).length} sujets — Entrée pour tout ajouter`
-                    : l === 'es'
-                    ? `${input.split('\n').filter(t => t.trim()).length} temas — Enter para añadir todos`
-                    : `${input.split('\n').filter(t => t.trim()).length} argomenti — Enter per aggiungere tutti`)
+                      ? `${input.split('\n').filter(t => t.trim()).length} topics — Enter to add all`
+                      : l === 'fr'
+                        ? `${input.split('\n').filter(t => t.trim()).length} sujets — Entrée pour tout ajouter`
+                        : l === 'es'
+                          ? `${input.split('\n').filter(t => t.trim()).length} temas — Enter para añadir todos`
+                          : `${input.split('\n').filter(t => t.trim()).length} argomenti — Enter per aggiungere tutti`)
                   : (l === 'pl' ? 'Enter by dodać · Shift+Enter = nowa linia · kilka linii = równolegle'
                     : l === 'en' ? 'Enter to add · Shift+Enter = new line · multiple lines = parallel'
-                    : l === 'fr' ? 'Entrée pour ajouter · Shift+Entrée = nouvelle ligne · plusieurs lignes = parallèle'
-                    : l === 'es' ? 'Enter para añadir · Shift+Enter = nueva línea · varias líneas = paralelo'
-                    : 'Enter per aggiungere · Shift+Enter = nuova riga · più righe = parallelo')
+                      : l === 'fr' ? 'Entrée pour ajouter · Shift+Entrée = nouvelle ligne · plusieurs lignes = parallèle'
+                        : l === 'es' ? 'Enter para añadir · Shift+Enter = nueva línea · varias líneas = paralelo'
+                          : 'Enter per aggiungere · Shift+Enter = nuova riga · più righe = parallelo')
                 }
               </p>
             </form>
@@ -960,91 +966,90 @@ const AppInner: React.FC<{
                   )}
                 </div>
                 <div style={{ maxHeight: '300px', overflowY: 'auto' }} className="space-y-1 pr-0.5">
-                {queue.map(job => (
-                  <div key={job.qid}
-                    className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs animate-fade-in"
-                    style={{
-                      background: job.status === 'done'
-                        ? 'var(--c-green-dim)'
-                        : job.status === 'error'
-                          ? 'rgba(205,33,42,.08)'
-                          : 'var(--c-surface)',
-                      border: `1px solid ${
-                        job.status === 'done'
+                  {queue.map(job => (
+                    <div key={job.qid}
+                      className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs animate-fade-in"
+                      style={{
+                        background: job.status === 'done'
+                          ? 'var(--c-green-dim)'
+                          : job.status === 'error'
+                            ? 'rgba(205,33,42,.08)'
+                            : 'var(--c-surface)',
+                        border: `1px solid ${job.status === 'done'
                           ? 'rgba(0,140,69,.2)'
                           : job.status === 'error'
                             ? 'rgba(205,33,42,.2)'
                             : 'var(--c-border)'
-                      }`,
-                    }}
-                  >
-                    {/* Status icon */}
-                    <span className="shrink-0">
-                      {job.status === 'running' && <SparklesIcon className="w-3.5 h-3.5 animate-spin" style={{ color: 'var(--c-green)' }} />}
-                      {job.status === 'pending' && <ArrowPathIcon className="w-3.5 h-3.5 animate-pulse" style={{ color: 'var(--c-faint)' }} />}
-                      {job.status === 'done'    && <CheckCircleIcon className="w-3.5 h-3.5" style={{ color: 'var(--c-green)' }} />}
-                      {job.status === 'error'   && <ExclamationCircleIcon className="w-3.5 h-3.5" style={{ color: 'var(--c-red)' }} />}
-                    </span>
-
-                    {/* Language flag */}
-                    {job.targetLang && (
-                      <span className="shrink-0 opacity-70" title={job.targetLang === 'it' ? 'Włoski' : job.targetLang === 'en' ? 'Angielski' : job.targetLang === 'fr' ? 'Francuski' : job.targetLang === 'es' ? 'Hiszpański' : ''}>
-                        <Flag code={job.targetLang} size={12} />
+                          }`,
+                      }}
+                    >
+                      {/* Status icon */}
+                      <span className="shrink-0">
+                        {job.status === 'running' && <SparklesIcon className="w-3.5 h-3.5 animate-spin" style={{ color: 'var(--c-green)' }} />}
+                        {job.status === 'pending' && <ArrowPathIcon className="w-3.5 h-3.5 animate-pulse" style={{ color: 'var(--c-faint)' }} />}
+                        {job.status === 'done' && <CheckCircleIcon className="w-3.5 h-3.5" style={{ color: 'var(--c-green)' }} />}
+                        {job.status === 'error' && <ExclamationCircleIcon className="w-3.5 h-3.5" style={{ color: 'var(--c-red)' }} />}
                       </span>
-                    )}
 
-                    {/* Topic */}
-                    <span className="flex-1 font-medium truncate" style={{ color: 'var(--c-text)' }}>
-                      {job.topic}
-                    </span>
-                    {job.status === 'error' && job.error && (
-                      <span className="truncate max-w-[120px] text-[9px]" style={{ color: 'var(--c-red)' }} title={job.error}>
-                        {job.error.slice(0, 40)}{job.error.length > 40 ? '…' : ''}
+                      {/* Language flag */}
+                      {job.targetLang && (
+                        <span className="shrink-0 opacity-70" title={job.targetLang === 'it' ? 'Włoski' : job.targetLang === 'en' ? 'Angielski' : job.targetLang === 'fr' ? 'Francuski' : job.targetLang === 'es' ? 'Hiszpański' : ''}>
+                          <Flag code={job.targetLang} size={12} />
+                        </span>
+                      )}
+
+                      {/* Topic */}
+                      <span className="flex-1 font-medium truncate" style={{ color: 'var(--c-text)' }}>
+                        {job.topic}
                       </span>
-                    )}
+                      {job.status === 'error' && job.error && (
+                        <span className="truncate max-w-[120px] text-[9px]" style={{ color: 'var(--c-red)' }} title={job.error}>
+                          {job.error.slice(0, 40)}{job.error.length > 40 ? '…' : ''}
+                        </span>
+                      )}
 
-                    {/* Status label / actions */}
-                    <span className="shrink-0 font-medium flex items-center gap-1" style={{
-                      color: job.status === 'done' ? 'var(--c-green)'
-                        : job.status === 'error' ? 'var(--c-red)'
-                        : job.status === 'running' ? 'var(--c-green)'
-                        : 'var(--c-faint)'
-                    }}>
-                      {job.status === 'running' && (l === 'pl' ? 'Generuję…' : l === 'en' ? 'Generating…' : l === 'fr' ? 'Génération…' : l === 'es' ? 'Generando…' : 'Generando…')}
-                      {job.status === 'pending' && (l === 'pl' ? 'W kolejce' : l === 'en' ? 'Queued' : l === 'fr' ? 'En attente' : l === 'es' ? 'En cola' : 'In attesa')}
-                      {job.status === 'done' && (
-                        <button
-                          onClick={() => openQueueLesson(job)}
-                          disabled={openingLessonId === job.lessonId}
-                          className="underline font-bold disabled:opacity-50"
-                          style={{ color: 'var(--c-green)' }}
-                        >
-                          {openingLessonId === job.lessonId
-                            ? (l === 'pl' ? 'Ładuję…' : l === 'en' ? 'Loading…' : l === 'fr' ? 'Chargement…' : l === 'es' ? 'Cargando…' : 'Carico…')
-                            : (l === 'pl' ? 'Otwórz →' : l === 'en' ? 'Open →' : l === 'fr' ? 'Ouvrir →' : l === 'es' ? 'Abrir →' : 'Apri →')}
+                      {/* Status label / actions */}
+                      <span className="shrink-0 font-medium flex items-center gap-1" style={{
+                        color: job.status === 'done' ? 'var(--c-green)'
+                          : job.status === 'error' ? 'var(--c-red)'
+                            : job.status === 'running' ? 'var(--c-green)'
+                              : 'var(--c-faint)'
+                      }}>
+                        {job.status === 'running' && (l === 'pl' ? 'Generuję…' : l === 'en' ? 'Generating…' : l === 'fr' ? 'Génération…' : l === 'es' ? 'Generando…' : 'Generando…')}
+                        {job.status === 'pending' && (l === 'pl' ? 'W kolejce' : l === 'en' ? 'Queued' : l === 'fr' ? 'En attente' : l === 'es' ? 'En cola' : 'In attesa')}
+                        {job.status === 'done' && (
+                          <button
+                            onClick={() => openQueueLesson(job)}
+                            disabled={openingLessonId === job.lessonId}
+                            className="underline font-bold disabled:opacity-50"
+                            style={{ color: 'var(--c-green)' }}
+                          >
+                            {openingLessonId === job.lessonId
+                              ? (l === 'pl' ? 'Ładuję…' : l === 'en' ? 'Loading…' : l === 'fr' ? 'Chargement…' : l === 'es' ? 'Cargando…' : 'Carico…')
+                              : (l === 'pl' ? 'Otwórz →' : l === 'en' ? 'Open →' : l === 'fr' ? 'Ouvrir →' : l === 'es' ? 'Abrir →' : 'Apri →')}
+                          </button>
+                        )}
+                        {job.status === 'error' && (
+                          <button
+                            onClick={() => retryQueueItem(job.qid)}
+                            className="flex items-center gap-0.5 font-bold underline"
+                            style={{ color: 'var(--c-red)' }}
+                            title={l === 'pl' ? 'Ponów próbę' : l === 'en' ? 'Retry' : l === 'fr' ? 'Réessayer' : l === 'es' ? 'Reintentar' : 'Riprova'}
+                          >
+                            <ArrowPathIcon className="w-3 h-3" />
+                            {l === 'pl' ? 'Ponów' : l === 'en' ? 'Retry' : l === 'fr' ? 'Réessayer' : l === 'es' ? 'Reintentar' : 'Riprova'}
+                          </button>
+                        )}
+                      </span>
+
+                      {/* Remove button (not running) */}
+                      {job.status !== 'running' && (
+                        <button onClick={() => removeQueueItem(job.qid)} className="shrink-0 p-0.5 rounded" style={{ color: 'var(--c-faint)' }}>
+                          <XMarkIcon className="w-3 h-3" />
                         </button>
                       )}
-                      {job.status === 'error' && (
-                        <button
-                          onClick={() => retryQueueItem(job.qid)}
-                          className="flex items-center gap-0.5 font-bold underline"
-                          style={{ color: 'var(--c-red)' }}
-                          title={l === 'pl' ? 'Ponów próbę' : l === 'en' ? 'Retry' : l === 'fr' ? 'Réessayer' : l === 'es' ? 'Reintentar' : 'Riprova'}
-                        >
-                          <ArrowPathIcon className="w-3 h-3" />
-                          {l === 'pl' ? 'Ponów' : l === 'en' ? 'Retry' : l === 'fr' ? 'Réessayer' : l === 'es' ? 'Reintentar' : 'Riprova'}
-                        </button>
-                      )}
-                    </span>
-
-                    {/* Remove button (not running) */}
-                    {job.status !== 'running' && (
-                      <button onClick={() => removeQueueItem(job.qid)} className="shrink-0 p-0.5 rounded" style={{ color: 'var(--c-faint)' }}>
-                        <XMarkIcon className="w-3 h-3" />
-                      </button>
-                    )}
-                  </div>
-                ))}
+                    </div>
+                  ))}
                 </div>
               </div>
             )}
@@ -1246,99 +1251,177 @@ const AppInner: React.FC<{
 
 // ─── Home Screen ──────────────────────────────────────────────────────────────
 
-const HomeScreen: React.FC<{ onSelect: (lang: TargetLang) => void }> = ({ onSelect }) => {
+interface LangOption {
+  code: TargetLang;
+  name: string;
+  pair: string;
+  emoji: string;
+  accent: string;
+  accentDim: string;
+}
+
+const LANG_OPTIONS: LangOption[] = [
+  { code: 'en', name: 'Angielski', pair: 'Polsko-angielski', emoji: '🇬🇧', accent: '#012169', accentDim: 'rgba(1,33,105,.08)' },
+  { code: 'fr', name: 'Francuski', pair: 'Polsko-francuski', emoji: '🇫🇷', accent: '#002395', accentDim: 'rgba(0,35,149,.08)' },
+  { code: 'es', name: 'Hiszpański', pair: 'Polsko-hiszpański', emoji: '🇪🇸', accent: '#c60b1e', accentDim: 'rgba(198,11,30,.08)' },
+  { code: 'it', name: 'Włoski', pair: 'Polsko-włoski', emoji: '🇮🇹', accent: '#009246', accentDim: 'rgba(0,146,70,.08)' },
+  { code: 'de', name: 'Niemiecki', pair: 'Polsko-niemiecki', emoji: '🇩🇪', accent: '#dd0000', accentDim: 'rgba(221,0,0,.08)' },
+];
+
+// Flaga na pełną szerokość karty — używamy FlagBanner zamiast Flag
+// Wszystkie bannery mają identyczny aspect-ratio; flagi zachowują proporcje przez preserveAspectRatio
+const BANNER_RATIO = '3/2'; // stały rozmiar dla wszystkich kart
+
+const FlagBanner: React.FC<{ code: TargetLang; accent: string }> = ({ code, accent }) => {
+  const svgStyle: React.CSSProperties = {
+    display: 'block',
+    width: '100%',
+    height: '100%',
+  };
+
+  const flagSvg: Record<TargetLang, React.ReactNode> = {
+    en: (
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 30" preserveAspectRatio="xMidYMid slice" style={svgStyle}>
+        <rect width="60" height="30" fill="#012169" />
+        <path d="M0,0 L60,30 M60,0 L0,30" stroke="#fff" strokeWidth="6" />
+        <path d="M0,0 L60,30 M60,0 L0,30" stroke="#C8102E" strokeWidth="4" />
+        <path d="M30,0 V30 M0,15 H60" stroke="#fff" strokeWidth="10" />
+        <path d="M30,0 V30 M0,15 H60" stroke="#C8102E" strokeWidth="6" />
+      </svg>
+    ),
+    fr: (
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 3 2" preserveAspectRatio="xMidYMid slice" style={svgStyle}>
+        <rect width="1" height="2" fill="#002395" />
+        <rect x="1" width="1" height="2" fill="#ffffff" />
+        <rect x="2" width="1" height="2" fill="#ED2939" />
+      </svg>
+    ),
+    es: (
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 3 2" preserveAspectRatio="xMidYMid slice" style={svgStyle}>
+        <rect width="3" height="2" fill="#c60b1e" />
+        <rect width="3" height="1" y="0.5" fill="#ffc400" />
+      </svg>
+    ),
+    it: (
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 3 2" preserveAspectRatio="xMidYMid slice" style={svgStyle}>
+        <rect width="1" height="2" fill="#009246" />
+        <rect x="1" width="1" height="2" fill="#ffffff" />
+        <rect x="2" width="1" height="2" fill="#ce2b37" />
+      </svg>
+    ),
+    de: (
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 3 3" preserveAspectRatio="xMidYMid slice" style={svgStyle}>
+        <rect width="3" height="1" fill="#000000" />
+        <rect width="3" height="1" y="1" fill="#dd0000" />
+        <rect width="3" height="1" y="2" fill="#ffce00" />
+      </svg>
+    ),
+  };
+
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center px-4 gap-10"
+    <div style={{
+      width: '100%',
+      aspectRatio: BANNER_RATIO,
+      overflow: 'hidden',
+      borderRadius: '10px 10px 0 0',
+      position: 'relative',
+      background: 'var(--c-bg)',
+      boxShadow: `0 2px 0 0 ${accent}30 inset`,
+    }}>
+      {flagSvg[code]}
+    </div>
+  );
+};
+
+const HomeScreen: React.FC<{ onSelect: (lang: TargetLang) => void }> = ({ onSelect }) => {
+  const [hoveredCode, setHoveredCode] = React.useState<TargetLang | null>(null);
+
+  return (
+    <div className="min-h-screen flex flex-col items-center justify-center px-4"
       style={{ background: 'var(--c-bg)', color: 'var(--c-text)' }}>
-      <div className="text-center space-y-3">
-        <div className="flex gap-1.5 justify-center mb-2">
-          <div className="w-3 h-3 rounded-full" style={{ background: 'var(--c-green)' }} />
-          <div className="w-3 h-3 rounded-full border" style={{ borderColor: 'var(--c-border)' }} />
-          <div className="w-3 h-3 rounded-full" style={{ background: 'var(--c-red)' }} />
+
+      {/* Hero header */}
+      <div className="text-center mb-12 space-y-4">
+        <div className="flex gap-2 justify-center mb-4">
+          <div className="w-3.5 h-3.5 rounded-full shadow-sm" style={{ background: 'var(--c-green)' }} />
+          <div className="w-3.5 h-3.5 rounded-full border-2" style={{ borderColor: 'var(--c-border)' }} />
+          <div className="w-3.5 h-3.5 rounded-full shadow-sm" style={{ background: 'var(--c-red)' }} />
         </div>
-        <h1 className="text-4xl md:text-5xl font-serif font-bold tracking-tight">
+        <h1 className="text-4xl md:text-6xl font-serif font-bold tracking-tight leading-none">
           <span className="hero-gradient">Językowy Mistrz AI</span>
         </h1>
-        <p className="text-sm" style={{ color: 'var(--c-muted)' }}>
+        <p className="text-base" style={{ color: 'var(--c-muted)' }}>
           Wybierz język, którego chcesz się uczyć
         </p>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-5 w-full max-w-4xl">
-        {/* Angielski */}
-        <button
-          onClick={() => onSelect('en')}
-          className="group card card-hover p-6 flex flex-col items-center gap-3 transition-all"
-        >
-          <Flag code="en" size={48} />
-          <div className="text-center">
-            <p className="font-serif font-bold text-lg" style={{ color: 'var(--c-text)' }}>Angielski</p>
-            <p className="text-xs mt-0.5" style={{ color: 'var(--c-muted)' }}>Polsko-angielski</p>
-          </div>
-          <span className="text-xs font-semibold group-hover:translate-x-1 transition-transform" style={{ color: 'var(--c-green)' }}>
-            Wybierz →
-          </span>
-        </button>
+      {/* Language cards grid */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 w-full max-w-5xl">
+        {LANG_OPTIONS.map((lang) => {
+          const isHovered = hoveredCode === lang.code;
+          return (
+            <button
+              key={lang.code}
+              onClick={() => onSelect(lang.code)}
+              onMouseEnter={() => setHoveredCode(lang.code)}
+              onMouseLeave={() => setHoveredCode(null)}
+              style={{
+                background: 'var(--c-surface)',
+                border: `1.5px solid ${isHovered ? lang.accent + '60' : 'var(--c-border)'}`,
+                borderRadius: 16,
+                overflow: 'hidden',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'stretch',
+                cursor: 'pointer',
+                transition: 'box-shadow 0.2s ease, border-color 0.2s ease',
+                boxShadow: isHovered
+                  ? `0 12px 32px ${lang.accent}28, 0 2px 8px rgba(0,0,0,.08)`
+                  : '0 1px 4px rgba(0,0,0,.06)',
+                padding: 0,
+              }}
+            >
+              {/* Flag banner — full width */}
+              <FlagBanner code={lang.code} accent={lang.accent} />
 
-        {/* Francuski */}
-        <button
-          onClick={() => onSelect('fr')}
-          className="group card card-hover p-6 flex flex-col items-center gap-3 transition-all"
-        >
-          <Flag code="fr" size={48} />
-          <div className="text-center">
-            <p className="font-serif font-bold text-lg" style={{ color: 'var(--c-text)' }}>Francuski</p>
-            <p className="text-xs mt-0.5" style={{ color: 'var(--c-muted)' }}>Polsko-francuski</p>
-          </div>
-          <span className="text-xs font-semibold group-hover:translate-x-1 transition-transform" style={{ color: 'var(--c-green)' }}>
-            Wybierz →
-          </span>
-        </button>
-
-        {/* Hiszpański */}
-        <button
-          onClick={() => onSelect('es')}
-          className="group card card-hover p-6 flex flex-col items-center gap-3 transition-all"
-        >
-          <Flag code="es" size={48} />
-          <div className="text-center">
-            <p className="font-serif font-bold text-lg" style={{ color: 'var(--c-text)' }}>Hiszpański</p>
-            <p className="text-xs mt-0.5" style={{ color: 'var(--c-muted)' }}>Polsko-hiszpański</p>
-          </div>
-          <span className="text-xs font-semibold group-hover:translate-x-1 transition-transform" style={{ color: 'var(--c-green)' }}>
-            Wybierz →
-          </span>
-        </button>
-
-        {/* Włoski */}
-        <button
-          onClick={() => onSelect('it')}
-          className="group card card-hover p-6 flex flex-col items-center gap-3 transition-all"
-        >
-          <Flag code="it" size={48} />
-          <div className="text-center">
-            <p className="font-serif font-bold text-lg" style={{ color: 'var(--c-text)' }}>Włoski</p>
-            <p className="text-xs mt-0.5" style={{ color: 'var(--c-muted)' }}>Polsko-włoski</p>
-          </div>
-          <span className="text-xs font-semibold group-hover:translate-x-1 transition-transform" style={{ color: 'var(--c-green)' }}>
-            Wybierz →
-          </span>
-        </button>
-
-        {/* Niemiecki */}
-        <button
-          onClick={() => onSelect('de')}
-          className="group card card-hover p-6 flex flex-col items-center gap-3 transition-all"
-        >
-          <Flag code="de" size={48} />
-          <div className="text-center">
-            <p className="font-serif font-bold text-lg" style={{ color: 'var(--c-text)' }}>Niemiecki</p>
-            <p className="text-xs mt-0.5" style={{ color: 'var(--c-muted)' }}>Polsko-niemiecki</p>
-          </div>
-          <span className="text-xs font-semibold group-hover:translate-x-1 transition-transform" style={{ color: 'var(--c-green)' }}>
-            Wybierz →
-          </span>
-        </button>
+              {/* Card content */}
+              <div style={{
+                padding: '14px 16px 16px',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: 8,
+                background: isHovered ? lang.accentDim : 'transparent',
+                transition: 'background 0.2s ease',
+              }}>
+                <div style={{ textAlign: 'center' }}>
+                  <p style={{
+                    fontFamily: 'Georgia, serif',
+                    fontWeight: 700,
+                    fontSize: '1.05rem',
+                    color: 'var(--c-text)',
+                    marginBottom: 2,
+                  }}>{lang.name}</p>
+                  <p style={{
+                    fontSize: '0.7rem',
+                    color: 'var(--c-muted)',
+                  }}>{lang.pair}</p>
+                </div>
+                <span style={{
+                  fontSize: '0.72rem',
+                  fontWeight: 600,
+                  color: isHovered ? lang.accent : 'var(--c-green)',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 3,
+                  transition: 'color 0.2s ease',
+                }}>
+                  Wybierz →
+                </span>
+              </div>
+            </button>
+          );
+        })}
       </div>
     </div>
   );
