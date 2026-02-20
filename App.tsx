@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useRef, useCallback, FormEvent } from 'react';
+import React, { useState, useEffect, useRef, FormEvent } from 'react';
 import { createRoot } from 'react-dom/client';
-import { generateLesson, generateEnglishLesson, generateFrenchLesson, loadModels, getSavedModel, saveModel, ORModel } from './services/geminiService';
+import { loadModels, getSavedModel, saveModel, ORModel } from './services/geminiService';
 import { LessonView, getFavorites, toggleFavorite } from './components/LessonView';
 import { LangProvider, useLang, useTheme, useFontSize } from './context/LangContext';
 import { Flag, LangFlag } from './components/Flag';
@@ -504,7 +504,6 @@ const ChangeKeyModal: React.FC<{ onClose: () => void; onSave: (key: string) => v
 // ─── Inner App ────────────────────────────────────────────────────────────────
 
 const DIFF_LEVELS = ['A1', 'A2', 'B1', 'B2', 'C1'] as const;
-const MAX_CONCURRENT = 10;
 
 const AppInner: React.FC<{ apiKey: string; onChangeKey: () => void; onBackToHome: () => void }> = ({ apiKey, onChangeKey, onBackToHome }) => {
   const { globalLang, toggleGlobal, targetLang } = useLang();
@@ -521,15 +520,9 @@ const AppInner: React.FC<{ apiKey: string; onChangeKey: () => void; onBackToHome
   const [diffFilter, setDiffFilter] = useState<string | null>(null);
   const [showFavsOnly, setShowFavsOnly] = useState(false);
   const [favSet, setFavSet] = useState<Set<string>>(() => getFavorites());
+  const [currentPage, setCurrentPage] = useState(1);
   const searchInputRef = useRef<HTMLInputElement>(null);
-
-  // Refs so callbacks always see current values without re-binding
-  const apiKeyRef = useRef(apiKey);
-  const activeModelRef = useRef(activeModel);
-  const targetLangRef = useRef(targetLang);
-  useEffect(() => { apiKeyRef.current = apiKey; }, [apiKey]);
-  useEffect(() => { activeModelRef.current = activeModel; }, [activeModel]);
-  useEffect(() => { targetLangRef.current = targetLang; }, [targetLang]);
+  const ITEMS_PER_PAGE = 20;
 
   // Wczytaj historię z pliku przy starcie
   useEffect(() => {
@@ -539,64 +532,54 @@ const AppInner: React.FC<{ apiKey: string; onChangeKey: () => void; onBackToHome
     });
   }, []);
 
-  // ── Queue runner ────────────────────────────────────────────────────────────
-  // Runs whenever queue changes: starts pending jobs up to MAX_CONCURRENT
-  const runQueue = useCallback((q: QueueItem[]) => {
-    const running = q.filter(j => j.status === 'running').length;
-    const pending = q.filter(j => j.status === 'pending');
-    const slots = MAX_CONCURRENT - running;
-    if (slots <= 0 || pending.length === 0) return;
+  // ── Server-side job polling ──────────────────────────────────────────────────
+  // Track which lesson IDs we've already fetched to avoid re-loading
+  const pendingLessonLoads = useRef<Set<string>>(new Set());
 
-    const toStart = pending.slice(0, slots);
-
-    // Mark them as running immediately
-    setQueue(prev => prev.map(j =>
-      toStart.some(s => s.qid === j.qid)
-        ? { ...j, status: 'running', startedAt: Date.now() }
-        : j
-    ));
-
-    // Fire off each one
-    toStart.forEach(job => {
-      const genFn = targetLangRef.current === 'en' ? generateEnglishLesson : targetLangRef.current === 'fr' ? generateFrenchLesson : generateLesson;
-      genFn(job.topic, apiKeyRef.current, activeModelRef.current)
-        .then(async lesson => {
-          await saveLesson(lesson);
-          setHistory(prev => [lesson, ...prev]);
-          setQueue(prev => {
-            const next = prev.map(j =>
-              j.qid === job.qid ? { ...j, status: 'done' as QueueStatus, lessonId: lesson.id } : j
-            );
-            // trigger next pending after state settles
-            setTimeout(() => setQueue(q2 => { runQueue(q2); return q2; }), 0);
-            return next;
-          });
-        })
-        .catch(err => {
-          setQueue(prev => {
-            const next = prev.map(j =>
-              j.qid === job.qid
-                ? { ...j, status: 'error' as QueueStatus, error: err?.message ?? 'Błąd generowania' }
-                : j
-            );
-            setTimeout(() => setQueue(q2 => { runQueue(q2); return q2; }), 0);
-            return next;
-          });
-        });
-    });
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Kick off runner when queue changes (only for pending/running items)
-  const prevQueueRef = useRef<QueueItem[]>([]);
   useEffect(() => {
-    const hadPending = prevQueueRef.current.some(j => j.status === 'pending');
-    const hasPending = queue.some(j => j.status === 'pending');
-    const hasRunning = queue.some(j => j.status === 'running');
-    if (hasPending || (hasRunning && hadPending)) {
-      runQueue(queue);
-    }
-    prevQueueRef.current = queue;
-  }, [queue, runQueue]);
+    if (!historyLoaded) return;
+
+    // Mark all already-loaded lessons so we don't re-fetch them
+    pendingLessonLoads.current = new Set(history.map(l => l.id));
+
+    const poll = async () => {
+      try {
+        const res = await fetch('/api/jobs');
+        if (!res.ok) return;
+        const serverJobs: Array<{
+          id: string; topic: string; targetLang: string;
+          status: string; lessonId?: string; error?: string; createdAt: number;
+        }> = await res.json();
+
+        // Sync local queue with server state
+        setQueue(serverJobs.map(sj => ({
+          qid: sj.id,
+          topic: sj.topic,
+          status: sj.status as QueueStatus,
+          lessonId: sj.lessonId,
+          error: sj.error,
+          startedAt: sj.createdAt,
+        })));
+
+        // Load any newly completed lessons not yet in history
+        for (const sj of serverJobs) {
+          if (sj.status === 'done' && sj.lessonId && !pendingLessonLoads.current.has(sj.lessonId)) {
+            pendingLessonLoads.current.add(sj.lessonId);
+            fetch(`/api/history/${sj.lessonId}`)
+              .then(r => r.ok ? r.json() : null)
+              .then(lesson => {
+                if (lesson) setHistory(prev => [lesson, ...prev.filter(l => l.id !== lesson.id)]);
+              })
+              .catch(() => { pendingLessonLoads.current.delete(sj.lessonId!); });
+          }
+        }
+      } catch { /* ignore transient poll errors */ }
+    };
+
+    poll();
+    const interval = setInterval(poll, 3000);
+    return () => clearInterval(interval);
+  }, [historyLoaded]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Keyboard shortcuts ──────────────────────────────────────────────────────
   useEffect(() => {
@@ -614,21 +597,56 @@ const AppInner: React.FC<{ apiKey: string; onChangeKey: () => void; onBackToHome
     return () => window.removeEventListener('keydown', h);
   }, [activeLesson, history]);
 
-  // ── Enqueue topic ───────────────────────────────────────────────────────────
-  const enqueueTopics = () => {
+  // ── Enqueue topics via server ────────────────────────────────────────────────
+  const enqueueTopics = async () => {
     const topics = input.split('\n').map(t => t.trim()).filter(Boolean);
     if (topics.length === 0) return;
-    const newItems: QueueItem[] = topics.map(topic => ({
-      qid: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    setInput('');
+
+    // Optimistic local entries while server responds
+    const tempItems: QueueItem[] = topics.map(topic => ({
+      qid: `tmp-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
       topic,
       status: 'pending',
     }));
+    setQueue(prev => [...prev, ...tempItems]);
+
+    // Create server-side jobs and replace temp entries with real IDs
+    const settled = await Promise.allSettled(
+      topics.map((topic, i) =>
+        fetch('/api/jobs', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ topic, targetLang, model: activeModel, apiKey }),
+        })
+          .then(r => r.ok ? r.json() : Promise.reject(new Error('Server error')))
+          .then(({ jobId }: { jobId: string }) => ({ tempQid: tempItems[i].qid, jobId, topic }))
+      )
+    );
+
     setQueue(prev => {
-      const next = [...prev, ...newItems];
-      setTimeout(() => setQueue(q2 => { runQueue(q2); return q2; }), 0);
+      let next = [...prev];
+      for (const result of settled) {
+        if (result.status === 'fulfilled') {
+          const { tempQid, jobId, topic: t } = result.value;
+          next = next.map(j => j.qid === tempQid
+            ? { qid: jobId, topic: t, status: 'pending' as QueueStatus, startedAt: Date.now() }
+            : j
+          );
+        } else {
+          // Mark the temp item as error if server rejected
+          const idx = settled.indexOf(result);
+          const tempQid = tempItems[idx]?.qid;
+          if (tempQid) {
+            next = next.map(j => j.qid === tempQid
+              ? { ...j, status: 'error' as QueueStatus, error: 'Failed to submit to server' }
+              : j
+            );
+          }
+        }
+      }
       return next;
     });
-    setInput('');
   };
 
   const handleSubmit = (e: FormEvent) => {
@@ -636,24 +654,31 @@ const AppInner: React.FC<{ apiKey: string; onChangeKey: () => void; onBackToHome
     enqueueTopics();
   };
 
-  const removeQueueItem = (qid: string) => {
-    setQueue(prev => prev.filter(j => j.qid !== qid || j.status === 'running'));
+  const removeQueueItem = async (qid: string) => {
+    // Don't remove running jobs
+    const job = queue.find(j => j.qid === qid);
+    if (job?.status === 'running') return;
+    setQueue(prev => prev.filter(j => j.qid !== qid));
+    if (!qid.startsWith('tmp-')) {
+      await fetch(`/api/jobs/${qid}`, { method: 'DELETE' }).catch(() => {});
+    }
   };
 
-  const retryQueueItem = (qid: string) => {
-    setQueue(prev => {
-      const next = prev.map(j =>
-        j.qid === qid && j.status === 'error'
-          ? { ...j, status: 'pending' as QueueStatus, error: undefined, startedAt: undefined }
-          : j
-      );
-      setTimeout(() => setQueue(q2 => { runQueue(q2); return q2; }), 0);
-      return next;
-    });
+  const retryQueueItem = async (qid: string) => {
+    setQueue(prev => prev.map(j =>
+      j.qid === qid ? { ...j, status: 'pending' as QueueStatus, error: undefined } : j
+    ));
+    await fetch(`/api/jobs/${qid}/retry`, { method: 'POST' }).catch(() => {});
   };
 
-  const clearFinished = () => {
-    setQueue(prev => prev.filter(j => j.status === 'pending' || j.status === 'running'));
+  const clearFinished = async () => {
+    const finishedIds = queue.filter(j => j.status === 'done' || j.status === 'error').map(j => j.qid);
+    setQueue(prev => prev.filter(j => j.status !== 'done' && j.status !== 'error'));
+    await Promise.allSettled(
+      finishedIds.filter(id => !id.startsWith('tmp-')).map(id =>
+        fetch(`/api/jobs/${id}`, { method: 'DELETE' })
+      )
+    );
   };
 
   const handleDelete = async (e: React.MouseEvent, id: string) => {
@@ -674,6 +699,9 @@ const AppInner: React.FC<{ apiKey: string; onChangeKey: () => void; onBackToHome
     saveModel(modelId);
   };
 
+  // Reset to page 1 when filters change
+  useEffect(() => { setCurrentPage(1); }, [search, diffFilter, showFavsOnly, targetLang]);
+
   const filteredHistory = history
     .filter(l => (l.targetLang ?? 'it') === targetLang)
     .filter(lesson => {
@@ -691,6 +719,9 @@ const AppInner: React.FC<{ apiKey: string; onChangeKey: () => void; onBackToHome
       }
       return true;
     });
+
+  const totalPages = Math.ceil(filteredHistory.length / ITEMS_PER_PAGE);
+  const pagedHistory = filteredHistory.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
 
   if (activeLesson) {
     return (
@@ -723,7 +754,7 @@ const AppInner: React.FC<{ apiKey: string; onChangeKey: () => void; onBackToHome
   };
 
   return (
-    <div className="min-h-screen font-sans" style={{ background: 'var(--c-bg)', color: 'var(--c-text)' }}>
+    <div className="min-h-screen font-sans flex flex-col" style={{ background: 'var(--c-bg)', color: 'var(--c-text)' }}>
       {/* Navbar */}
       <nav className="glass-nav sticky top-0 z-50">
         <div className="max-w-screen-2xl mx-auto px-4 h-12 flex items-center justify-between gap-2">
@@ -805,7 +836,7 @@ const AppInner: React.FC<{ apiKey: string; onChangeKey: () => void; onBackToHome
         </div>
       </nav>
 
-      <main className="px-4 py-8">
+      <main className="flex-1 px-4 py-8">
         <div className="max-w-screen-2xl mx-auto space-y-10">
 
           {/* Hero */}
@@ -880,6 +911,7 @@ const AppInner: React.FC<{ apiKey: string; onChangeKey: () => void; onBackToHome
                     </button>
                   )}
                 </div>
+                <div style={{ maxHeight: '300px', overflowY: 'auto' }} className="space-y-1 pr-0.5">
                 {queue.map(job => (
                   <div key={job.qid}
                     className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs animate-fade-in"
@@ -958,6 +990,7 @@ const AppInner: React.FC<{ apiKey: string; onChangeKey: () => void; onBackToHome
                     )}
                   </div>
                 ))}
+                </div>
               </div>
             )}
           </div>
@@ -1070,19 +1103,68 @@ const AppInner: React.FC<{ apiKey: string; onChangeKey: () => void; onBackToHome
                 )}
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                {filteredHistory.map((lesson) => (
-                  <LessonCard
-                    key={lesson.id}
-                    lesson={lesson}
-                    lang={globalLang}
-                    onOpen={() => setActiveLesson(lesson)}
-                    onDelete={(e) => handleDelete(e, lesson.id)}
-                    isFav={favSet.has(lesson.id)}
-                    onToggleFav={(e) => handleToggleFav(e, lesson.id)}
-                  />
-                ))}
-              </div>
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                  {pagedHistory.map((lesson) => (
+                    <LessonCard
+                      key={lesson.id}
+                      lesson={lesson}
+                      lang={globalLang}
+                      onOpen={() => setActiveLesson(lesson)}
+                      onDelete={(e) => handleDelete(e, lesson.id)}
+                      isFav={favSet.has(lesson.id)}
+                      onToggleFav={(e) => handleToggleFav(e, lesson.id)}
+                    />
+                  ))}
+                </div>
+                {/* Pagination */}
+                {totalPages > 1 && (
+                  <div className="flex items-center justify-center gap-2 pt-4">
+                    <button
+                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                      disabled={currentPage === 1}
+                      className="px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all disabled:opacity-30"
+                      style={{ background: 'var(--c-surface)', borderColor: 'var(--c-border)', color: 'var(--c-text)' }}
+                    >
+                      ← {l === 'pl' ? 'Poprzednia' : l === 'en' ? 'Previous' : l === 'fr' ? 'Précédente' : 'Precedente'}
+                    </button>
+                    <div className="flex items-center gap-1">
+                      {Array.from({ length: totalPages }, (_, i) => i + 1)
+                        .filter(p => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 2)
+                        .reduce<(number | 'ellipsis')[]>((acc, p, idx, arr) => {
+                          if (idx > 0 && p - (arr[idx - 1] as number) > 1) acc.push('ellipsis');
+                          acc.push(p);
+                          return acc;
+                        }, [])
+                        .map((item, idx) =>
+                          item === 'ellipsis' ? (
+                            <span key={`e${idx}`} className="px-1 text-xs" style={{ color: 'var(--c-faint)' }}>…</span>
+                          ) : (
+                            <button
+                              key={item}
+                              onClick={() => setCurrentPage(item as number)}
+                              className="w-8 h-8 rounded-lg text-xs font-bold transition-all"
+                              style={currentPage === item
+                                ? { background: 'var(--c-text)', color: theme === 'dark' ? '#13151b' : '#fff' }
+                                : { background: 'var(--c-surface)', color: 'var(--c-muted)', border: '1px solid var(--c-border)' }
+                              }
+                            >
+                              {item}
+                            </button>
+                          )
+                        )}
+                    </div>
+                    <button
+                      onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                      disabled={currentPage === totalPages}
+                      className="px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all disabled:opacity-30"
+                      style={{ background: 'var(--c-surface)', borderColor: 'var(--c-border)', color: 'var(--c-text)' }}
+                    >
+                      {l === 'pl' ? 'Następna' : l === 'en' ? 'Next' : l === 'fr' ? 'Suivante' : 'Successiva'} →
+                    </button>
+                  </div>
+                )}
+              </>
             )}
           </div>
         </div>

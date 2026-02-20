@@ -293,6 +293,82 @@ const lessonSchema = {
   ],
 };
 
+// ─── JSON Parsing Helpers ─────────────────────────────────────────────────────
+
+const VALID_DIFF_LEVELS = ['A1', 'A2', 'B1', 'B2', 'C1'] as const;
+
+/**
+ * Tries to parse a JSON string. If parsing fails, attempts to extract a JSON
+ * object by finding the first { ... } block. Returns the parsed object or
+ * throws if no valid JSON can be recovered.
+ */
+function tryParseJSON(text: string): Record<string, unknown> {
+  // First, try a direct parse
+  try {
+    return JSON.parse(text) as Record<string, unknown>;
+  } catch {
+    // Try to find a JSON object in the text (e.g. response wrapped in markdown)
+    const match = text.match(/\{[\s\S]*\}/);
+    if (match) {
+      try {
+        return JSON.parse(match[0]) as Record<string, unknown>;
+      } catch {
+        // Incomplete JSON — try to recover by trimming to last complete value
+        const raw = match[0];
+        // Try progressively shorter substrings to find parseable JSON
+        for (let i = raw.length - 1; i > 0; i--) {
+          if (raw[i] === '}' || raw[i] === ']' || raw[i] === '"') {
+            try {
+              // Attempt to close all open braces/brackets
+              const sub = raw.slice(0, i + 1);
+              // Count unmatched braces to try auto-closing
+              let open = 0;
+              let inStr = false;
+              let escape = false;
+              for (const ch of sub) {
+                if (escape) { escape = false; continue; }
+                if (ch === '\\' && inStr) { escape = true; continue; }
+                if (ch === '"') { inStr = !inStr; continue; }
+                if (inStr) continue;
+                if (ch === '{') open++;
+                else if (ch === '}') open--;
+              }
+              const closed = sub + '}'.repeat(Math.max(0, open));
+              return JSON.parse(closed) as Record<string, unknown>;
+            } catch {
+              // keep trying
+            }
+          }
+        }
+      }
+    }
+    throw new Error('Invalid or incomplete JSON response from API');
+  }
+}
+
+/**
+ * Normalises the difficulty_level field to a single valid CEFR level.
+ * If the model returns "B1-B2" or similar, we take the first level.
+ * If no valid level is found, defaults to "B1".
+ */
+function normalizeDifficultyLevel(raw: unknown): string {
+  if (typeof raw !== 'string') return 'B1';
+  // Check for exact match first
+  if ((VALID_DIFF_LEVELS as readonly string[]).includes(raw)) return raw;
+  // Try to extract first valid level from compound strings like "B1-B2" or "B1/B2"
+  const match = raw.match(/\b(A1|A2|B1|B2|C1)\b/);
+  if (match) return match[1];
+  return 'B1';
+}
+
+/**
+ * Validates that all required top-level fields are present in the parsed data.
+ * Returns an array of missing field names.
+ */
+function findMissingRequiredFields(data: Record<string, unknown>, required: string[]): string[] {
+  return required.filter(field => !(field in data) || data[field] === null || data[field] === undefined);
+}
+
 // ─── OpenRouter model type ────────────────────────────────────────────────────
 
 export interface ORModel {
@@ -497,7 +573,17 @@ Remember: this resource must be so good that a learner could use it as their pri
   const text = response.choices[0]?.message?.content;
   if (!text) throw new Error("Empty response from API");
 
-  const data = JSON.parse(text);
+  const data = tryParseJSON(text);
+
+  // Validate required fields
+  const REQUIRED = ['topic','subtitle','emoji','tags','difficulty_level','introduction','key_takeaways','grammar','common_mistakes','useful_phrases','mini_story','dialogue','closing_reflection','culture','cultural_notes','proverb','idiom'];
+  const missing = findMissingRequiredFields(data, REQUIRED);
+  if (missing.length > 0) {
+    throw new Error(`Incomplete lesson JSON — missing fields: ${missing.join(', ')}`);
+  }
+
+  // Normalize difficulty level to single CEFR code
+  data.difficulty_level = normalizeDifficultyLevel(data.difficulty_level);
 
   // Generate vocabulary as a separate request with full lesson context
   const vocabulary = await generateItalianVocabulary(data, apiKey, model || getSavedModel() || DEFAULT_MODEL, client);
@@ -510,7 +596,7 @@ Remember: this resource must be so good that a learner could use it as their pri
       : `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
     timestamp: Date.now(),
     targetLang: 'it' as const,
-  };
+  } as Lesson;
 };
 
 // ─── Italian Vocabulary Generation ────────────────────────────────────────────
@@ -775,7 +861,17 @@ Remember: this resource must be so good that a learner could use it as their pri
   const text = response.choices[0]?.message?.content;
   if (!text) throw new Error("Empty response from API");
 
-  const data = JSON.parse(text);
+  const data = tryParseJSON(text);
+
+  // Validate required fields
+  const REQUIRED = ['topic','subtitle','emoji','tags','difficulty_level','introduction','key_takeaways','grammar','common_mistakes','useful_phrases','mini_story','dialogue','closing_reflection','culture','cultural_notes','proverb','idiom'];
+  const missing = findMissingRequiredFields(data, REQUIRED);
+  if (missing.length > 0) {
+    throw new Error(`Incomplete lesson JSON — missing fields: ${missing.join(', ')}`);
+  }
+
+  // Normalize difficulty level to single CEFR code
+  data.difficulty_level = normalizeDifficultyLevel(data.difficulty_level);
 
   // Generate vocabulary as a separate request with full lesson context
   const vocabulary = await generateEnglishVocabulary(data, apiKey, model || getSavedModel() || DEFAULT_MODEL, client);
@@ -788,7 +884,7 @@ Remember: this resource must be so good that a learner could use it as their pri
       : `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
     timestamp: Date.now(),
     targetLang: 'en' as const,
-  };
+  } as Lesson;
 };
 
 // ─── English Vocabulary Generation ────────────────────────────────────────────
@@ -1038,7 +1134,17 @@ Remember: this resource must be so good that a learner could use it as their pri
   const text = response.choices[0]?.message?.content;
   if (!text) throw new Error("Empty response from API");
 
-  const data = JSON.parse(text);
+  const data = tryParseJSON(text);
+
+  // Validate required fields
+  const REQUIRED = ['topic','subtitle','emoji','tags','difficulty_level','introduction','key_takeaways','grammar','common_mistakes','useful_phrases','mini_story','dialogue','closing_reflection','culture','cultural_notes','proverb','idiom'];
+  const missing = findMissingRequiredFields(data, REQUIRED);
+  if (missing.length > 0) {
+    throw new Error(`Incomplete lesson JSON — missing fields: ${missing.join(', ')}`);
+  }
+
+  // Normalize difficulty level to single CEFR code
+  data.difficulty_level = normalizeDifficultyLevel(data.difficulty_level);
 
   // Generate vocabulary as a separate request with full lesson context
   const vocabulary = await generateFrenchVocabulary(data, apiKey, model || getSavedModel() || DEFAULT_MODEL, client);
@@ -1051,7 +1157,7 @@ Remember: this resource must be so good that a learner could use it as their pri
       : `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
     timestamp: Date.now(),
     targetLang: 'fr' as const,
-  };
+  } as Lesson;
 };
 
 // ─── French Vocabulary Generation ─────────────────────────────────────────────
