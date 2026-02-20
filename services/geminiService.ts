@@ -398,15 +398,14 @@ export function saveModel(modelId: string) {
 }
 
 export async function loadModels(apiKey: string): Promise<ORModel[]> {
-  const res = await fetch("https://openrouter.ai/api/v1/models", {
-    headers: { Authorization: `Bearer ${apiKey}` },
-  });
+  // Filter to models that support response_format (JSON mode) — required for lesson generation
+  const res = await fetch(
+    "https://openrouter.ai/api/v1/models?supported_parameters=response_format",
+    { headers: { Authorization: `Bearer ${apiKey}` } }
+  );
   if (!res.ok) throw new Error("Failed to load models");
   const json = await res.json();
-  // Filtrujemy wyłącznie modele chat (text → text)
-  return (json.data as ORModel[]).filter(
-    (m) => m.id && !m.id.includes(":free") === false || m.id
-  );
+  return (json.data as ORModel[]).filter(m => m.id);
 }
 
 // ─── API Call ─────────────────────────────────────────────────────────────────
@@ -568,7 +567,11 @@ Remember: this resource must be so good that a learner could use it as their pri
       },
     ],
     response_format: { type: "json_object" },
-  });
+    // OpenRouter extensions: heal malformed JSON; route only to JSON-capable providers
+    plugins: [{ id: "response-healing" }],
+    provider: { require_parameters: true },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  } as any);
 
   const text = response.choices[0]?.message?.content;
   if (!text) throw new Error("Empty response from API");
@@ -673,7 +676,11 @@ CRITICAL: Respond with ONLY a raw JSON object in this exact format:
       },
     ],
     response_format: { type: "json_object" },
-  });
+    // OpenRouter extensions: heal malformed JSON; route only to JSON-capable providers
+    plugins: [{ id: "response-healing" }],
+    provider: { require_parameters: true },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  } as any);
 
   const vocabText = response.choices[0]?.message?.content;
   if (!vocabText) return [];
@@ -856,7 +863,11 @@ Remember: this resource must be so good that a learner could use it as their pri
       },
     ],
     response_format: { type: "json_object" },
-  });
+    // OpenRouter extensions: heal malformed JSON; route only to JSON-capable providers
+    plugins: [{ id: "response-healing" }],
+    provider: { require_parameters: true },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  } as any);
 
   const text = response.choices[0]?.message?.content;
   if (!text) throw new Error("Empty response from API");
@@ -957,7 +968,11 @@ CRITICAL: Respond with ONLY a raw JSON object in this exact format:
       },
     ],
     response_format: { type: "json_object" },
-  });
+    // OpenRouter extensions: heal malformed JSON; route only to JSON-capable providers
+    plugins: [{ id: "response-healing" }],
+    provider: { require_parameters: true },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  } as any);
 
   const vocabText = response.choices[0]?.message?.content;
   if (!vocabText) return [];
@@ -1129,7 +1144,11 @@ Remember: this resource must be so good that a learner could use it as their pri
       },
     ],
     response_format: { type: "json_object" },
-  });
+    // OpenRouter extensions: heal malformed JSON; route only to JSON-capable providers
+    plugins: [{ id: "response-healing" }],
+    provider: { require_parameters: true },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  } as any);
 
   const text = response.choices[0]?.message?.content;
   if (!text) throw new Error("Empty response from API");
@@ -1232,7 +1251,11 @@ CRITICAL: Respond with ONLY a raw JSON object in this exact format:
       },
     ],
     response_format: { type: "json_object" },
-  });
+    // OpenRouter extensions: heal malformed JSON; route only to JSON-capable providers
+    plugins: [{ id: "response-healing" }],
+    provider: { require_parameters: true },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  } as any);
 
   const vocabText = response.choices[0]?.message?.content;
   if (!vocabText) return [];
