@@ -43,32 +43,32 @@ interface LessonViewProps {
 
 // ─── Label maps ───────────────────────────────────────────────────────────────
 
-const POS_LABEL: Record<PartOfSpeech, { pl: string; it: string; fr: string }> = {
-  noun:        { pl: 'rzecz.',   it: 'sost.',  fr: 'n.'      },
-  verb:        { pl: 'czas.',    it: 'verb.',  fr: 'v.'      },
-  adjective:   { pl: 'przym.',  it: 'agg.',   fr: 'adj.'    },
-  adverb:      { pl: 'przysł.', it: 'avv.',   fr: 'adv.'    },
-  phrase:      { pl: 'zwrot',   it: 'loc.',   fr: 'loc.'    },
-  interjection:{ pl: 'wykrz.',  it: 'inter.', fr: 'interj.' },
-  conjunction: { pl: 'spójn.',  it: 'cong.',  fr: 'conj.'   },
-  preposition: { pl: 'przyim.', it: 'prep.',  fr: 'prép.'   },
+const POS_LABEL: Record<PartOfSpeech, { pl: string; it: string; fr: string; es: string }> = {
+  noun:        { pl: 'rzecz.',   it: 'sost.',  fr: 'n.',      es: 'sust.'   },
+  verb:        { pl: 'czas.',    it: 'verb.',  fr: 'v.',      es: 'v.'      },
+  adjective:   { pl: 'przym.',  it: 'agg.',   fr: 'adj.',    es: 'adj.'    },
+  adverb:      { pl: 'przysł.', it: 'avv.',   fr: 'adv.',    es: 'adv.'    },
+  phrase:      { pl: 'zwrot',   it: 'loc.',   fr: 'loc.',    es: 'loc.'    },
+  interjection:{ pl: 'wykrz.',  it: 'inter.', fr: 'interj.', es: 'interj.' },
+  conjunction: { pl: 'spójn.',  it: 'cong.',  fr: 'conj.',   es: 'conj.'   },
+  preposition: { pl: 'przyim.', it: 'prep.',  fr: 'prép.',   es: 'prep.'   },
 };
 
-const REG_LABEL: Record<Register, { pl: string; it: string; fr: string }> = {
-  formal:     { pl: 'formal.',    it: 'formale',    fr: 'formel'   },
-  informal:   { pl: 'nieformal.', it: 'informale',  fr: 'informel' },
-  colloquial: { pl: 'potoczny',   it: 'colloq.',    fr: 'fam.'     },
-  literary:   { pl: 'literacki',  it: 'letterario', fr: 'littér.'  },
-  regional:   { pl: 'regionalny', it: 'regionale',  fr: 'régional' },
-  vulgar:     { pl: 'wulgarny',   it: 'volgare',    fr: 'vulgaire' },
+const REG_LABEL: Record<Register, { pl: string; it: string; fr: string; es: string }> = {
+  formal:     { pl: 'formal.',    it: 'formale',    fr: 'formel',   es: 'formal'    },
+  informal:   { pl: 'nieformal.', it: 'informale',  fr: 'informel', es: 'informal'  },
+  colloquial: { pl: 'potoczny',   it: 'colloq.',    fr: 'fam.',     es: 'coloquial' },
+  literary:   { pl: 'literacki',  it: 'letterario', fr: 'littér.',  es: 'literario' },
+  regional:   { pl: 'regionalny', it: 'regionale',  fr: 'régional', es: 'regional'  },
+  vulgar:     { pl: 'wulgarny',   it: 'volgare',    fr: 'vulgaire', es: 'vulgar'    },
 };
 
-const MISTAKE_LABEL: Record<MistakeCategory, { pl: string; it: string; fr: string }> = {
-  false_friend: { pl: 'Fałszywy przyjaciel', it: 'Falso amico',  fr: 'Faux ami'      },
-  grammar:      { pl: 'Gramatyka',           it: 'Grammatica',   fr: 'Grammaire'     },
-  pronunciation:{ pl: 'Wymowa',              it: 'Pronuncia',    fr: 'Prononciation' },
-  usage:        { pl: 'Użycie',              it: 'Uso',          fr: 'Usage'         },
-  spelling:     { pl: 'Pisownia',            it: 'Ortografia',   fr: 'Orthographe'   },
+const MISTAKE_LABEL: Record<MistakeCategory, { pl: string; it: string; fr: string; es: string }> = {
+  false_friend: { pl: 'Fałszywy przyjaciel', it: 'Falso amico',  fr: 'Faux ami',       es: 'Falso amigo'    },
+  grammar:      { pl: 'Gramatyka',           it: 'Grammatica',   fr: 'Grammaire',      es: 'Gramática'      },
+  pronunciation:{ pl: 'Wymowa',              it: 'Pronuncia',    fr: 'Prononciation',  es: 'Pronunciación'  },
+  usage:        { pl: 'Użycie',              it: 'Uso',          fr: 'Usage',          es: 'Uso'            },
+  spelling:     { pl: 'Pisownia',            it: 'Ortografia',   fr: 'Orthographe',    es: 'Ortografía'     },
 };
 
 // colour tokens via inline styles (var-based)
@@ -102,11 +102,11 @@ const GENDER_STYLE: Record<string, { bg: string; text: string; border: string }>
   invariant:{ bg: '#f8fafc', text: '#64748b', border: '#e2e8f0' },
 };
 
-const GENDER_LABEL: Record<string, { pl: string; it: string; fr: string }> = {
-  m:        { pl: 'm.',     it: 'm.',   fr: 'm.'    },
-  f:        { pl: 'ż.',     it: 'f.',   fr: 'f.'    },
-  pl:       { pl: 'l.mn.', it: 'pl.',  fr: 'pl.'   },
-  invariant:{ pl: 'niezm.',it: 'inv.', fr: 'inv.'  },
+const GENDER_LABEL: Record<string, { pl: string; it: string; fr: string; es: string }> = {
+  m:        { pl: 'm.',     it: 'm.',   fr: 'm.',    es: 'm.'    },
+  f:        { pl: 'ż.',     it: 'f.',   fr: 'f.',    es: 'f.'    },
+  pl:       { pl: 'l.mn.', it: 'pl.',  fr: 'pl.',   es: 'pl.'   },
+  invariant:{ pl: 'niezm.',it: 'inv.', fr: 'inv.',  es: 'inv.'  },
 };
 
 const REGISTER_STYLE: Record<Register, React.CSSProperties> = {
@@ -144,12 +144,12 @@ function splitText(text: string): string[] {
   return chunks.length ? chunks : [raw];
 }
 
-const useTTS = (targetLang: 'it' | 'en' | 'fr' = 'it') => {
+const useTTS = (targetLang: 'it' | 'en' | 'fr' | 'es' = 'it') => {
   const [rate, setRate] = useState(0.9);
   const [speakId, setSpeakId] = useState<string | null>(null);
   const voiceRef = React.useRef<SpeechSynthesisVoice | null>(null);
   const [hasItalianVoice, setHasItalianVoice] = useState(false);
-  const ttsLang = targetLang === 'en' ? 'en-GB' : targetLang === 'fr' ? 'fr-FR' : 'it-IT';
+  const ttsLang = targetLang === 'en' ? 'en-GB' : targetLang === 'fr' ? 'fr-FR' : targetLang === 'es' ? 'es-ES' : 'it-IT';
 
   useEffect(() => {
     const findVoice = () => {
@@ -165,6 +165,12 @@ const useTTS = (targetLang: 'it' | 'en' | 'fr' = 'it') => {
           voices.find(v => v.lang === 'fr-FR' && v.localService) ||
           voices.find(v => v.lang === 'fr-FR') ||
           voices.find(v => v.lang.startsWith('fr')) ||
+          null;
+      } else if (targetLang === 'es') {
+        voiceRef.current =
+          voices.find(v => v.lang === 'es-ES' && v.localService) ||
+          voices.find(v => v.lang === 'es-ES') ||
+          voices.find(v => v.lang.startsWith('es')) ||
           null;
       } else {
         voiceRef.current =
@@ -283,7 +289,8 @@ const FlashcardQuiz: React.FC<{
   const { globalLang: l, targetLang } = useLang();
   const isEnQ = targetLang === 'en';
   const isFrQ = targetLang === 'fr';
-  const t3q = (pl: string, it: string, en: string, fr?: string) => l === 'pl' ? pl : isEnQ ? en : isFrQ ? (fr ?? en) : it;
+  const isEsQ = targetLang === 'es';
+  const t3q = (pl: string, it: string, en: string, fr?: string, es?: string) => l === 'pl' ? pl : isEnQ ? en : isFrQ ? (fr ?? en) : isEsQ ? (es ?? it) : it;
   const items = lesson.vocabulary;
   const [state, setState] = useState<QuizState>({
     index: 0,
@@ -531,11 +538,11 @@ const SpeakBtn: React.FC<{
 }> = ({ italianText, id, speak, stop, speakId, label, className = '' }) => {
   const { globalLang, targetLang } = useLang();
   const active = speakId === id;
-  const stopLbl  = globalLang === 'pl' ? 'Zatrzymaj' : globalLang === 'en' ? 'Stop' : globalLang === 'fr' ? 'Arrêter' : 'Ferma';
-  const listenLbl = globalLang === 'pl' ? 'Odsłuchaj' : globalLang === 'en' ? 'Listen' : globalLang === 'fr' ? 'Écouter' : 'Ascolta';
+  const stopLbl  = globalLang === 'pl' ? 'Zatrzymaj' : globalLang === 'en' ? 'Stop' : globalLang === 'fr' ? 'Arrêter' : globalLang === 'es' ? 'Detener' : 'Ferma';
+  const listenLbl = globalLang === 'pl' ? 'Odsłuchaj' : globalLang === 'en' ? 'Listen' : globalLang === 'fr' ? 'Écouter' : globalLang === 'es' ? 'Escuchar' : 'Ascolta';
   const listenTitle = globalLang === 'pl'
-    ? (targetLang === 'en' ? 'Odsłuchaj po angielsku' : targetLang === 'fr' ? 'Odsłuchaj po francusku' : 'Odsłuchaj po włosku')
-    : globalLang === 'en' ? 'Listen in English' : globalLang === 'fr' ? 'Écouter en français' : 'Ascolta in italiano';
+    ? (targetLang === 'en' ? 'Odsłuchaj po angielsku' : targetLang === 'fr' ? 'Odsłuchaj po francusku' : targetLang === 'es' ? 'Odsłuchaj po hiszpańsku' : 'Odsłuchaj po włosku')
+    : globalLang === 'en' ? 'Listen in English' : globalLang === 'fr' ? 'Écouter en français' : globalLang === 'es' ? 'Escuchar en español' : 'Ascolta in italiano';
   return (
     <button
       onClick={() => active ? stop() : speak(italianText, id)}
@@ -577,20 +584,21 @@ const VocabCard: React.FC<{
   const { globalLang: l, targetLang } = useLang();
   const isEn = targetLang === 'en';
   const isFrV = targetLang === 'fr';
-  const t3v = (pl: string, it: string, en: string, fr?: string) => l === 'pl' ? pl : isEn ? en : isFrV ? (fr ?? en) : it;
-  const labelKey = l === 'pl' ? 'pl' : isFrV ? 'fr' : 'it';
+  const isEsV = targetLang === 'es';
+  const t3v = (pl: string, it: string, en: string, fr?: string, es?: string) => l === 'pl' ? pl : isEn ? en : isFrV ? (fr ?? en) : isEsV ? (es ?? it) : it;
+  const labelKey = l === 'pl' ? 'pl' : isFrV ? 'fr' : isEsV ? 'es' : 'it';
 
   const posLabel    = POS_LABEL[item.part_of_speech]?.[labelKey] ?? item.part_of_speech;
   const genderLabel = item.gender ? (GENDER_LABEL[item.gender]?.[labelKey] ?? item.gender) : null;
   const gs          = item.gender ? GENDER_STYLE[item.gender] : null;
 
   const LL = {
-    etymology:  t3v('Etymologia',      'Etimologia',         'Etymology',          'Étymologie'),
-    synonyms:   t3v('Synonimy',        'Sinonimi',           'Synonyms',           'Synonymes'),
-    antonyms:   t3v('Antonimy',        'Contrari',           'Antonyms',           'Antonymes'),
-    wordFamily: t3v('Rodzina wyrazów', 'Famiglia di parole', 'Word family',        'Famille de mots'),
-    listenSent: t3v('Odsłuchaj zdanie','Ascolta la frase',   'Listen to sentence', 'Écouter la phrase'),
-    pluralLbl:  t3v('l.mn.:',          'pl.',                'pl.:',               'pl. :'),
+    etymology:  t3v('Etymologia',      'Etimologia',         'Etymology',          'Étymologie',     'Etimología'),
+    synonyms:   t3v('Synonimy',        'Sinonimi',           'Synonyms',           'Synonymes',      'Sinónimos'),
+    antonyms:   t3v('Antonimy',        'Contrari',           'Antonyms',           'Antonymes',      'Antónimos'),
+    wordFamily: t3v('Rodzina wyrazów', 'Famiglia di parole', 'Word family',        'Famille de mots','Familia de palabras'),
+    listenSent: t3v('Odsłuchaj zdanie','Ascolta la frase',   'Listen to sentence', 'Écouter la phrase','Escuchar la frase'),
+    pluralLbl:  t3v('l.mn.:',          'pl.',                'pl.:',               'pl. :',          'pl.:'),
   };
 
   return (
@@ -758,9 +766,10 @@ export const LessonView: React.FC<LessonViewProps> = ({ lesson, onBack, onChange
   const { globalLang: l, toggleGlobal, targetLang } = useLang();
   const isEn = targetLang === 'en';
   const isFr = targetLang === 'fr';
+  const isEs = targetLang === 'es';
   // Helper: pick target-language text from a bilingual field
-  const tl = (b?: { it?: string; en?: string; fr?: string; pl?: string }): string =>
-    b ? ((isEn ? b.en : isFr ? b.fr : b.it) ?? b.pl ?? '') : '';
+  const tl = (b?: { it?: string; en?: string; fr?: string; es?: string; pl?: string }): string =>
+    b ? ((isEn ? b.en : isFr ? b.fr : isEs ? b.es : b.it) ?? b.pl ?? '') : '';
   const { theme, toggleTheme } = useTheme();
   const { fontSizeIndex, increaseFontSize, decreaseFontSize } = useFontSize();
   const { rate, setRate, speak, stop, speakId, hasItalianVoice } = useTTS(targetLang);
@@ -790,53 +799,53 @@ export const LessonView: React.FC<LessonViewProps> = ({ lesson, onBack, onChange
   const scrollTo = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
 
   // t3 helper: pick based on display lang (pl vs target)
-  const t3 = (pl: string, it: string, en: string, fr?: string) =>
-    l === 'pl' ? pl : isEn ? en : isFr ? (fr ?? en) : it;
+  const t3 = (pl: string, it: string, en: string, fr?: string, es?: string) =>
+    l === 'pl' ? pl : isEn ? en : isFr ? (fr ?? en) : isEs ? (es ?? it) : it;
 
   const L = {
-    library:      t3('Biblioteka',                    'Biblioteca',             'Library',           'Bibliothèque'),
-    toc:          t3('Spis treści',                   'Sommario',               'Contents',          'Sommaire'),
-    trivia:       t3('Ciekawostka',                   'Curiosità',              'Did you know',      'Le saviez-vous'),
-    readMins:     (n: number) => t3(`${n} min czytania`, `${n} min lettura`,    `${n} min read`,     `${n} min de lecture`),
-    keyTakeaways: t3('Co wyniesiesz z tej lekcji',    'Cosa imparerai',         'Key takeaways',     'Points clés'),
-    examples:     t3('Przykłady',                     'Esempi',                 'Examples',          'Exemples'),
-    exceptions:   t3('Wyjątki',                       'Eccezioni',              'Exceptions',        'Exceptions'),
-    mnemonic:     t3('Wskazówka mnemotechniczna',     'Aiuto mnemonico',        'Memory tip',        'Astuce mnémotechnique'),
-    wrong:        t3('Źle',                           'Sbagliato',              'Wrong',             'Incorrect'),
-    correct:      t3('Dobrze',                        'Corretto',               'Correct',           'Correct'),
-    listenIntro:  t3('Odsłuchaj wstęp',               'Ascolta introduzione',   'Listen to intro',   'Écouter l\'intro'),
-    listenStory:  t3('Odsłuchaj opowiadanie',         'Ascolta il racconto',    'Listen to story',   'Écouter l\'histoire'),
-    listenCulture:t3('Odsłuchaj tekst',               'Ascolta testo',          'Listen to text',    'Écouter le texte'),
-    playDialogue: t3('Odtwórz cały dialog',           'Riproduci dialogo',      'Play full dialogue','Lire le dialogue'),
-    translation:  t3('Tłumaczenie',                   'Traduzione',             'Translation',       'Traduction'),
-    meaning:      t3('Znaczenie',                     'Significato',            'Meaning',           'Signification'),
-    origin:       t3('Pochodzenie',                   'Origine',                'Origin',            'Origine'),
-    literally:    t3('Dosłownie',                     'Letteralmente',          'Literally',         'Littéralement'),
-    exampleLbl:   t3('Przykład',                      'Esempio',                'Example',           'Exemple'),
-    didYouKnow:   t3('Czy wiesz, że…',               'Lo sapevi che…',         'Did you know…',     'Le saviez-vous…'),
-    regional:     t3('Różnice regionalne',            'Varianti regionali',     'Regional variants', 'Variantes régionales'),
-    apiKey:       t3('Zmień klucz API',               'Cambia chiave API',      'Change API key',    'Changer la clé API'),
-    voiceFound:   t3('Głos znaleziony',               'Voce italiana trovata',  'Voice found',       'Voix trouvée'),
-    voiceMissing: t3('Brak głosu',                    'Nessuna voce italiana',  'No voice found',    'Aucune voix trouvée'),
+    library:      t3('Biblioteka',                    'Biblioteca',             'Library',           'Bibliothèque',          'Biblioteca'),
+    toc:          t3('Spis treści',                   'Sommario',               'Contents',          'Sommaire',              'Contenido'),
+    trivia:       t3('Ciekawostka',                   'Curiosità',              'Did you know',      'Le saviez-vous',        '¿Sabías que'),
+    readMins:     (n: number) => t3(`${n} min czytania`, `${n} min lettura`,    `${n} min read`,     `${n} min de lecture`,   `${n} min de lectura`),
+    keyTakeaways: t3('Co wyniesiesz z tej lekcji',    'Cosa imparerai',         'Key takeaways',     'Points clés',           'Puntos clave'),
+    examples:     t3('Przykłady',                     'Esempi',                 'Examples',          'Exemples',              'Ejemplos'),
+    exceptions:   t3('Wyjątki',                       'Eccezioni',              'Exceptions',        'Exceptions',            'Excepciones'),
+    mnemonic:     t3('Wskazówka mnemotechniczna',     'Aiuto mnemonico',        'Memory tip',        'Astuce mnémotechnique', 'Ayuda mnemotécnica'),
+    wrong:        t3('Źle',                           'Sbagliato',              'Wrong',             'Incorrect',             'Incorrecto'),
+    correct:      t3('Dobrze',                        'Corretto',               'Correct',           'Correct',               'Correcto'),
+    listenIntro:  t3('Odsłuchaj wstęp',               'Ascolta introduzione',   'Listen to intro',   'Écouter l\'intro',      'Escuchar intro'),
+    listenStory:  t3('Odsłuchaj opowiadanie',         'Ascolta il racconto',    'Listen to story',   'Écouter l\'histoire',   'Escuchar historia'),
+    listenCulture:t3('Odsłuchaj tekst',               'Ascolta testo',          'Listen to text',    'Écouter le texte',      'Escuchar texto'),
+    playDialogue: t3('Odtwórz cały dialog',           'Riproduci dialogo',      'Play full dialogue','Lire le dialogue',      'Reproducir diálogo'),
+    translation:  t3('Tłumaczenie',                   'Traduzione',             'Translation',       'Traduction',            'Traducción'),
+    meaning:      t3('Znaczenie',                     'Significato',            'Meaning',           'Signification',         'Significado'),
+    origin:       t3('Pochodzenie',                   'Origine',                'Origin',            'Origine',               'Origen'),
+    literally:    t3('Dosłownie',                     'Letteralmente',          'Literally',         'Littéralement',         'Literalmente'),
+    exampleLbl:   t3('Przykład',                      'Esempio',                'Example',           'Exemple',               'Ejemplo'),
+    didYouKnow:   t3('Czy wiesz, że…',               'Lo sapevi che…',         'Did you know…',     'Le saviez-vous…',       '¿Sabías que…'),
+    regional:     t3('Różnice regionalne',            'Varianti regionali',     'Regional variants', 'Variantes régionales',  'Variantes regionales'),
+    apiKey:       t3('Zmień klucz API',               'Cambia chiave API',      'Change API key',    'Changer la clé API',    'Cambiar clave API'),
+    voiceFound:   t3('Głos znaleziony',               'Voce italiana trovata',  'Voice found',       'Voix trouvée',          'Voz encontrada'),
+    voiceMissing: t3('Brak głosu',                    'Nessuna voce italiana',  'No voice found',    'Aucune voix trouvée',   'Sin voz disponible'),
     diffLabels: {
-      A1: { pl: 'Początkujący', it: 'Principiante', en: 'Beginner',       fr: 'Débutant' },
-      A2: { pl: 'Elementarny',  it: 'Elementare',   en: 'Elementary',     fr: 'Élémentaire' },
-      B1: { pl: 'Średniozaaw.', it: 'Intermedio',   en: 'Intermediate',   fr: 'Intermédiaire' },
-      B2: { pl: 'Wyższy śred.', it: 'Interm. sup.', en: 'Upper-Interm.',  fr: 'Interm. sup.' },
-      C1: { pl: 'Zaawansowany', it: 'Avanzato',     en: 'Advanced',       fr: 'Avancé' },
+      A1: { pl: 'Początkujący', it: 'Principiante', en: 'Beginner',       fr: 'Débutant',      es: 'Principiante'    },
+      A2: { pl: 'Elementarny',  it: 'Elementare',   en: 'Elementary',     fr: 'Élémentaire',   es: 'Elemental'       },
+      B1: { pl: 'Średniozaaw.', it: 'Intermedio',   en: 'Intermediate',   fr: 'Intermédiaire', es: 'Intermedio'      },
+      B2: { pl: 'Wyższy śred.', it: 'Interm. sup.', en: 'Upper-Interm.',  fr: 'Interm. sup.',  es: 'Interm. sup.'    },
+      C1: { pl: 'Zaawansowany', it: 'Avanzato',     en: 'Advanced',       fr: 'Avancé',        es: 'Avanzado'        },
     },
   };
 
   const NAV_ITEMS = [
-    { id: 'intro',    pl: 'Wstęp',       it: 'Intro',      en: 'Intro',      fr: 'Intro',      icon: SparklesIcon },
-    { id: 'vocab',    pl: 'Słownictwo',  it: 'Lessico',    en: 'Vocabulary', fr: 'Vocabulaire',icon: BookOpenIcon },
-    { id: 'grammar',  pl: 'Gramatyka',   it: 'Grammatica', en: 'Grammar',    fr: 'Grammaire',  icon: AcademicCapIcon },
-    { id: 'phrases',  pl: 'Zwroty',      it: 'Frasi',      en: 'Phrases',    fr: 'Phrases',    icon: ChatBubbleBottomCenterTextIcon },
-    { id: 'mistakes', pl: 'Błędy',       it: 'Errori',     en: 'Mistakes',   fr: 'Erreurs',    icon: ExclamationTriangleIcon },
-    { id: 'story',    pl: 'Opowiadanie', it: 'Racconto',   en: 'Story',      fr: 'Histoire',   icon: BookmarkIcon },
-    { id: 'dialogue', pl: 'Dialog',      it: 'Dialogo',    en: 'Dialogue',   fr: 'Dialogue',   icon: LanguageIcon },
-    { id: 'culture',  pl: 'Kultura',     it: 'Cultura',    en: 'Culture',    fr: 'Culture',    icon: GlobeEuropeAfricaIcon },
-    { id: 'gems',     pl: 'Perełki',     it: 'Gemme',      en: 'Gems',       fr: 'Joyaux',     icon: StarIcon },
+    { id: 'intro',    pl: 'Wstęp',       it: 'Intro',      en: 'Intro',      fr: 'Intro',       es: 'Intro',      icon: SparklesIcon },
+    { id: 'vocab',    pl: 'Słownictwo',  it: 'Lessico',    en: 'Vocabulary', fr: 'Vocabulaire', es: 'Vocabulario',icon: BookOpenIcon },
+    { id: 'grammar',  pl: 'Gramatyka',   it: 'Grammatica', en: 'Grammar',    fr: 'Grammaire',   es: 'Gramática',  icon: AcademicCapIcon },
+    { id: 'phrases',  pl: 'Zwroty',      it: 'Frasi',      en: 'Phrases',    fr: 'Phrases',     es: 'Frases',     icon: ChatBubbleBottomCenterTextIcon },
+    { id: 'mistakes', pl: 'Błędy',       it: 'Errori',     en: 'Mistakes',   fr: 'Erreurs',     es: 'Errores',    icon: ExclamationTriangleIcon },
+    { id: 'story',    pl: 'Opowiadanie', it: 'Racconto',   en: 'Story',      fr: 'Histoire',    es: 'Historia',   icon: BookmarkIcon },
+    { id: 'dialogue', pl: 'Dialog',      it: 'Dialogo',    en: 'Dialogue',   fr: 'Dialogue',    es: 'Diálogo',    icon: LanguageIcon },
+    { id: 'culture',  pl: 'Kultura',     it: 'Cultura',    en: 'Culture',    fr: 'Culture',     es: 'Cultura',    icon: GlobeEuropeAfricaIcon },
+    { id: 'gems',     pl: 'Perełki',     it: 'Gemme',      en: 'Gems',       fr: 'Joyaux',      es: 'Joyas',      icon: StarIcon },
   ];
 
   const speakerSides = useMemo<Record<string, 'left' | 'right'>>(() => {
@@ -928,7 +937,7 @@ export const LessonView: React.FC<LessonViewProps> = ({ lesson, onBack, onChange
               style={{ background: 'var(--c-text)', color: theme === 'dark' ? '#13151b' : '#fff', width: 'auto', padding: '0 10px', gap: 4 }}
             >
               <LanguageIcon className="w-3.5 h-3.5 shrink-0" />
-              <span>{l === 'pl' ? 'PL' : l === 'en' ? 'EN' : l === 'fr' ? 'FR' : 'IT'}</span>
+              <span>{l === 'pl' ? 'PL' : l === 'en' ? 'EN' : l === 'fr' ? 'FR' : l === 'es' ? 'ES' : 'IT'}</span>
               <LangFlag lang={l} size={14} />
             </button>
 
@@ -986,14 +995,14 @@ export const LessonView: React.FC<LessonViewProps> = ({ lesson, onBack, onChange
           <aside className="hidden lg:block lg:col-span-2">
             <div className="sticky top-14 space-y-0.5">
               <p className="micro-label mb-2 pl-2">{L.toc}</p>
-              {NAV_ITEMS.map(({ id, pl, it, en, fr, icon: Icon }) => (
+              {NAV_ITEMS.map(({ id, pl, it, en, fr, es, icon: Icon }) => (
                 <button
                   key={id}
                   onClick={() => scrollTo(id)}
                   className={`nav-btn ${activeSection === id ? 'active' : ''}`}
                 >
                   <Icon />
-                  {l === 'pl' ? pl : isEn ? en : isFr ? fr : it}
+                  {l === 'pl' ? pl : isEn ? en : isFr ? fr : isEs ? es : it}
                 </button>
               ))}
 
@@ -1079,7 +1088,7 @@ export const LessonView: React.FC<LessonViewProps> = ({ lesson, onBack, onChange
                     {L.readMins(lesson.estimated_reading_minutes ?? 0)}
                   </span>
                   <span style={{ color: 'var(--c-faint)' }}>
-                    {new Date(lesson.timestamp).toLocaleDateString(l === 'pl' ? 'pl-PL' : l === 'en' ? 'en-GB' : l === 'fr' ? 'fr-FR' : 'it-IT')}
+                    {new Date(lesson.timestamp).toLocaleDateString(l === 'pl' ? 'pl-PL' : l === 'en' ? 'en-GB' : l === 'fr' ? 'fr-FR' : l === 'es' ? 'es-ES' : 'it-IT')}
                   </span>
                 </div>
 
@@ -1253,7 +1262,7 @@ export const LessonView: React.FC<LessonViewProps> = ({ lesson, onBack, onChange
                         {ph.register && (
                           <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded border"
                             style={REGISTER_STYLE[ph.register]}>
-                            {REG_LABEL[ph.register]?.[l === 'pl' ? 'pl' : isFr ? 'fr' : 'it'] ?? ph.register}
+                            {REG_LABEL[ph.register]?.[l === 'pl' ? 'pl' : isFr ? 'fr' : isEs ? 'es' : 'it'] ?? ph.register}
                           </span>
                         )}
                       </div>
@@ -1275,8 +1284,8 @@ export const LessonView: React.FC<LessonViewProps> = ({ lesson, onBack, onChange
               <SectionHeading
                 id="mistakes"
                 icon={ExclamationTriangleIcon}
-                title={t3('Uwaga na błędy', 'Attenzione agli Errori', 'Watch Out for Mistakes', 'Attention aux erreurs')}
-                subtitle={t3('Pułapki dla Polaków uczących się', 'Trappole per chi parla polacco', 'Common traps for Polish speakers', 'Pièges pour les polonophones')}
+                title={t3('Uwaga na błędy', 'Attenzione agli Errori', 'Watch Out for Mistakes', 'Attention aux erreurs', 'Cuidado con los errores')}
+                subtitle={t3('Pułapki dla Polaków uczących się', 'Trappole per chi parla polacco', 'Common traps for Polish speakers', 'Pièges pour les polonophones', 'Trampas para hablantes de polaco')}
               />
               <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                 {lesson.common_mistakes.map((m, i) => {
@@ -1285,7 +1294,7 @@ export const LessonView: React.FC<LessonViewProps> = ({ lesson, onBack, onChange
                     <div key={i} className="card overflow-hidden">
                       <div className="px-3 py-1.5" style={{ background: MISTAKE_BG[cat] }}>
                         <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: MISTAKE_TEXT[cat] }}>
-                          {MISTAKE_LABEL[cat]?.[l === 'pl' ? 'pl' : isFr ? 'fr' : 'it'] ?? cat}
+                          {MISTAKE_LABEL[cat]?.[l === 'pl' ? 'pl' : isFr ? 'fr' : isEs ? 'es' : 'it'] ?? cat}
                         </span>
                       </div>
                       <div className="p-4 space-y-3">
