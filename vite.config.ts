@@ -20,7 +20,7 @@ function ensureJobsDir() {
 interface ServerJob {
   id: string;
   topic: string;
-  targetLang: 'it' | 'en' | 'fr' | 'es' | 'de';
+  targetLang: 'it' | 'en' | 'fr' | 'es' | 'de' | 'cs';
   model: string;
   apiKey: string; // stored server-side only, never returned to client
   status: 'pending' | 'running' | 'done' | 'error';
@@ -88,6 +88,8 @@ async function processJob(job: ServerJob, server: any): Promise<void> {
       ? mod.generateSpanishLesson
       : job.targetLang === 'de'
       ? mod.generateGermanLesson
+      : job.targetLang === 'cs'
+      ? mod.generateCzechLesson
       : mod.generateLesson;
 
     const lesson = await genFn(job.topic, job.apiKey, job.model);
@@ -223,7 +225,7 @@ function historyApiPlugin() {
               const job: ServerJob = {
                 id: genJobId(),
                 topic: String(topic),
-                targetLang: targetLang as 'it' | 'en' | 'fr' | 'es' | 'de',
+                targetLang: targetLang as 'it' | 'en' | 'fr' | 'es' | 'de' | 'cs',
                 model: String(model || 'google/gemini-3-pro-preview'),
                 apiKey: String(apiKey),
                 status: 'pending',
