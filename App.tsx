@@ -30,6 +30,7 @@ interface QueueItem {
   qid: string;       // unique queue id
   topic: string;
   status: QueueStatus;
+  targetLang?: 'it' | 'en' | 'fr';
   lessonId?: string; // set when done
   error?: string;
   startedAt?: number;
@@ -556,6 +557,7 @@ const AppInner: React.FC<{ apiKey: string; onChangeKey: () => void; onBackToHome
           qid: sj.id,
           topic: sj.topic,
           status: sj.status as QueueStatus,
+          targetLang: sj.targetLang as 'it' | 'en' | 'fr' | undefined,
           lessonId: sj.lessonId,
           error: sj.error,
           startedAt: sj.createdAt,
@@ -608,6 +610,7 @@ const AppInner: React.FC<{ apiKey: string; onChangeKey: () => void; onBackToHome
       qid: `tmp-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
       topic,
       status: 'pending',
+      targetLang,
     }));
     setQueue(prev => [...prev, ...tempItems]);
 
@@ -937,6 +940,13 @@ const AppInner: React.FC<{ apiKey: string; onChangeKey: () => void; onBackToHome
                       {job.status === 'done'    && <CheckCircleIcon className="w-3.5 h-3.5" style={{ color: 'var(--c-green)' }} />}
                       {job.status === 'error'   && <ExclamationCircleIcon className="w-3.5 h-3.5" style={{ color: 'var(--c-red)' }} />}
                     </span>
+
+                    {/* Language flag */}
+                    {job.targetLang && (
+                      <span className="shrink-0 opacity-70" title={job.targetLang === 'it' ? 'Włoski' : job.targetLang === 'en' ? 'Angielski' : 'Francuski'}>
+                        <Flag code={job.targetLang} size={12} />
+                      </span>
+                    )}
 
                     {/* Topic */}
                     <span className="flex-1 font-medium truncate" style={{ color: 'var(--c-text)' }}>
