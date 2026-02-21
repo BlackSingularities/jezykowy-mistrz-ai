@@ -2,7 +2,7 @@ import OpenAI from "openai";
 import { Lesson, Exercise, ExerciseSet, TargetLang } from "../types";
 
 const MAX_EXERCISES = 20;
-const DEFAULT_MODEL = "google/gemini-2.5-pro-preview-03-25";
+const DEFAULT_MODEL = "google/gemini-3-pro-preview";
 
 /** Build a distribution string for the given count */
 function buildDistributionPrompt(count: number, langNamePl: string, tl: string): string {

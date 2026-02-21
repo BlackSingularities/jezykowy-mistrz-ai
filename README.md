@@ -77,10 +77,10 @@ Aby zmienić klucz w dowolnym momencie, kliknij ikonę klucza w prawym górnym r
 
 ### Zmiana modelu AI
 
-Domyślnie używany jest `google/gemini-2.5-flash`. Możesz zmienić model w [services/geminiService.ts](services/geminiService.ts):
+Domyślnie używany jest `google/gemini-3-pro-preview`. Możesz zmienić model w [services/aiService.ts](services/aiService.ts):
 
 ```ts
-model: "google/gemini-2.5-flash",  // np. "anthropic/claude-3.5-sonnet"
+export const DEFAULT_MODEL = "google/gemini-3-pro-preview";  // np. "anthropic/claude-3.5-sonnet"
 ```
 
 Pełna lista modeli: [openrouter.ai/models](https://openrouter.ai/models)
@@ -93,7 +93,7 @@ wloski-mistrz-ai/
 │   ├── LessonView.tsx     # Widok pełnego artykułu (TTS, sekcje, przełącznik języka)
 │   └── QuizSection.tsx    # Komponent quizów
 ├── services/
-│   └── geminiService.ts   # Integracja z OpenRouter API
+│   └── aiService.ts       # Integracja z OpenRouter API
 ├── App.tsx                # Główny komponent + ekran konfiguracji klucza API
 ├── types.ts               # Definicje typów TypeScript
 ├── index.tsx              # Entry point

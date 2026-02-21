@@ -293,7 +293,7 @@ function historyApiPlugin() {
                 res.end(JSON.stringify({ error: 'Missing required field: topic or imageData' }));
                 return;
               }
-              const resolvedModel = model || cfg.model || 'google/gemini-2.5-pro-preview-03-25';
+              const resolvedModel = model || cfg.model || 'google/gemini-3-pro-preview';
               const job: ServerJob = {
                 id: genJobId(),
                 topic: String(topic || ''),
