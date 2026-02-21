@@ -7,7 +7,7 @@ import {
   ClipboardDocumentIcon,
 } from '@heroicons/react/24/outline';
 import { CheckCircleIcon as CheckCircleSolid, ExclamationCircleIcon } from '@heroicons/react/24/solid';
-import { correctText, CorrectionResult, DetailedCorrectionResult, getSavedModel } from '../services/geminiService';
+import type { CorrectionResult, DetailedCorrectionResult } from '../services/aiService';
 import { useLang, useTheme } from '../context/LangContext';
 import { Flag } from './Flag';
 import type { TargetLang } from '../types';
@@ -128,10 +128,16 @@ export const TextCorrectionView: React.FC<TextCorrectionViewProps> = ({ onClose,
     setError('');
     setResult(null);
     try {
-      const apiKey = localStorage.getItem('openrouter_api_key') || '';
-      if (!apiKey) { setError('Brak klucza API'); return; }
-      const model = getSavedModel();
-      const r = await correctText(text.trim(), selectedLang, corrMode, apiKey, model);
+      const res = await fetch('/api/correct', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: text.trim(), lang: selectedLang, mode: corrMode }),
+      });
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => ({}));
+        throw new Error(errBody?.error || `Błąd serwera (${res.status})`);
+      }
+      const r: CorrectionResult = await res.json();
       setResult(r);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : String(err));

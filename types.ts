@@ -336,27 +336,3 @@ export interface ExerciseAttempt {
   userAnswer?: string;
 }
 
-// ─── Text Correction ──────────────────────────────────────────────────────────
-
-export type CorrectionMode = 'quick' | 'detailed';
-
-export interface TextError {
-  type: 'grammar' | 'spelling' | 'style' | 'punctuation' | 'vocabulary' | 'syntax';
-  original: string;
-  corrected: string;
-  context_before?: string;
-  context_after?: string;
-  explanation_pl: string;
-  rule?: string;
-}
-
-export interface TextCorrectionResult {
-  original: string;
-  corrected: string;
-  language_detected: string;
-  errors: TextError[];
-  overall_assessment_pl: string;
-  register?: string;
-  score: number;
-  has_errors: boolean;
-}
