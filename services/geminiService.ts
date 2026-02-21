@@ -2154,3 +2154,225 @@ CRITICAL: Respond with ONLY a raw JSON object:
     return [];
   }
 }
+
+// ─── Portuguese Lesson Generation ─────────────────────────────────────────────
+
+export const generatePortugueseLesson = async (topic: string, apiKey: string, model?: string): Promise<Lesson> => {
+  const client = new OpenAI({
+    baseURL: "https://openrouter.ai/api/v1",
+    apiKey,
+    dangerouslyAllowBrowser: true,
+  });
+
+  const response = await client.chat.completions.create({
+    model: model || getSavedModel() || DEFAULT_MODEL,
+    messages: [
+      {
+        role: "system",
+        content: `You are a world-class bilingual (Portuguese/Polish) editorial expert, cultural authority, and master language educator with 30 years of experience teaching Portuguese (European Portuguese — português europeu) to Polish speakers.
+
+You produce premium, literary-quality learning resources that feel like an issue of a prestigious culture magazine combined with a rigorous academic reference.
+
+Your guiding principles:
+— DEPTH over brevity: every field must be thorough, substantive, and information-dense. Short answers are a failure.
+— CULTURAL AUTHENTICITY: Portugal is rich in history, literature (Camões, Pessoa, Saramago), music (fado), maritime heritage, and the lusophone world. Mention the Age of Discoveries, the Algarve, Lisbon, Porto, the Douro valley, the Azores, Madeira, and connections to Brazil and the Portuguese-speaking world where relevant.
+— LINGUISTIC PRECISION: European Portuguese has nasal vowels, complex vowel reduction in unstressed syllables, the personal infinitive, the future subjunctive, and a rich system of clitic pronouns. Distinguish registers, including formal BP/EP differences where pedagogically useful.
+— POLISH SPEAKER FOCUS: always identify which Polish structures or words cause interference. Note where Polish and Portuguese share Latin roots (both have extensive Romance vocabulary through borrowings), and where they diverge. Key challenges for Polish speakers: nasal vowels (ã, ẽ, õ), the vowel reduction (unstressed o sounds like u, unstressed e is often swallowed), placing clitic pronouns, the personal infinitive, and the distinction between ser/estar.
+— LITERARY QUALITY: your Portuguese must be native European Portuguese, varied, and beautiful. Your Polish must be elegant and precise.
+— MEMORABILITY: every explanation, example, and note should be crafted so a learner will never forget it.
+
+CRITICAL LENGTH REQUIREMENTS — enforce these strictly:
+• introduction: ≥ 6 sentences per language
+• vocabulary definitions: ≥ 2–3 sentences per language each
+• grammar explanations: ≥ 5 sentences per language each
+• grammar examples: ≥ 4 example pairs per grammar point
+• common_mistakes explanations: ≥ 3–4 sentences per language each
+
+• deep_dive: ≥ 250 words per language — in-depth analytical/narrative feature
+• culture content: ≥ 250 words per language
+• cultural_notes content: ≥ 3 sentences per language each
+• mini_story text: ≥ 200 words per language
+• dialogue: ≥ 16 lines total, each utterance 1–3 sentences
+• closing_reflection: ≥ 200 words per language — synthesising closing essay
+• proverb meaning: ≥ 4 sentences per language
+• idiom meaning + origin: ≥ 3 sentences each per language
+
+IMPORTANT: All bilingual fields use "pt" (not "it", "en", "fr", "es", "de", "cs", or "ru") for the Portuguese content, and "pl" for Polish.
+DO NOT produce shortened, telegraphic, or bullet-point-style content in any field that requests prose.`,
+      },
+      {
+        role: "user",
+        content: `Create a comprehensive, premium bilingual (Portuguese–Polish) learning resource on the topic: "${topic}".
+
+Target audience: Polish adults learning European Portuguese (B1–B2 level).
+Tone: Engaging, magazine-quality, culturally immersive, intellectually serious.
+
+MANDATORY requirements — failure to meet ANY of these is unacceptable:
+1. ALL prose fields must be long and substantive.
+2. ALL explanations and prose must be provided in BOTH Portuguese and Polish — every "Bilingual" field has "pt" and "pl" keys (NOT "it", "en", "fr", "es", "de", "cs", or "ru").
+3. DO NOT include a "vocabulary" field — vocabulary is generated separately.
+4. Grammar: 3 sections minimum, each with ≥ 5-sentence explanations and ≥ 4 example pairs. Focus on Portuguese-specific structures (ser vs. estar, personal infinitive, future subjunctive, clitic pronouns, nasal vowels, the conjunctive/subjunctive mood, pretérito perfeito vs. imperfeito).
+5. Common mistakes: SPECIFIC to Polish speakers — name the Polish word causing interference. Key false friends and traps: "borracha" (rubber, not drunk woman), "polvo" (octopus, not dust), "apelido" (surname, not appeal), "embaraçada" (entangled/embarrassed, NOT pregnant — that's "grávida"), the ser/estar confusion, clitic pronoun placement, nasal vowel pronunciation. ≥ 5 mistakes total.
+6. Mini-story: ≥ 200 words per language, literary quality, named characters set in Portugal (Lisboa, Porto, Sintra, Algarve, Douro, Açores, Madeira, etc.).
+7. Dialogue: ≥ 16 lines, authentic native European Portuguese, multi-sentence utterances, grammar notes on ≥ 6 lines.
+8. Culture content: ≥ 250 words per language — historical depth, regional specifics, contemporary relevance (fado, Age of Discoveries, Pastéis de Belém, Vinho Verde, Port wine, Fernando Pessoa, José Saramago, the saudade concept, Carnation Revolution).
+9. Cultural notes: 3–4 notes, each ≥ 3 sentences per language.
+10. Proverb: must be a REAL Portuguese proverb (provérbio). Meaning field ≥ 4 sentences per language.
+11. Idiom: genuine Portuguese idiom/expression. Origin story required (≥ 3 sentences per language).
+12. Phrases: 8 items, each with detailed context ≥ 2–3 sentences per language.
+13. deep_dive_title: concise encyclopedic section title (3–7 words). deep_dive: ≥ 250 words per language — authoritative, encyclopedic analysis. NO "lesson/journey" framing.
+14. closing_reflection_title: concise encyclopedic section title. closing_reflection: ≥ 200 words per language — scholarly synthesis. NO "lesson/journey" framing.
+
+CRITICAL — You MUST respond with a single valid JSON object. No markdown, no code fences, no extra text — ONLY the raw JSON.
+
+Use "pt" key (not "it", "en", "fr", "es", "de", "cs", or "ru") for Portuguese content in all Bilingual fields. Do NOT include a "vocabulary" field:
+{
+  "topic": {"pt": "...", "pl": "..."},
+  "subtitle": {"pt": "...", "pl": "..."},
+  "emoji": "🇵🇹",
+  "tags": ["tag1", "tag2", "tag3"],
+  "difficulty_level": "B1",
+  "estimated_reading_minutes": 12,
+  "introduction": {"pt": "...", "pl": "..."},
+  "key_takeaways": [{"pt": "...", "pl": "..."}, {"pt": "...", "pl": "..."}, {"pt": "...", "pl": "..."}],
+  "trivia": {"pt": "...", "pl": "..."},
+  "regional_notes": {"pt": "...", "pl": "..."},
+  "deep_dive_title": {"pt": "...", "pl": "..."},
+  "deep_dive": {"pt": "...", "pl": "..."},
+  "grammar": [...],
+  "common_mistakes": [...],
+  "useful_phrases": [...],
+  "mini_story": {"title": {"pt": "...", "pl": "..."}, "text": {"pt": "...", "pl": "..."}, "moral": {"pt": "...", "pl": "..."}},
+  "dialogue": {"title": {"pt": "...", "pl": "..."}, "setting": {"pt": "...", "pl": "..."}, "lines": [...], "vocabulary_highlight": ["..."]},
+  "closing_reflection_title": {"pt": "...", "pl": "..."},
+  "closing_reflection": {"pt": "...", "pl": "..."},
+  "culture": {"title": {"pt": "...", "pl": "..."}, "content": {"pt": "...", "pl": "..."}, "did_you_know": {"pt": "...", "pl": "..."}},
+  "cultural_notes": [{"icon": "🏰", "title": {"pt": "...", "pl": "..."}, "content": {"pt": "...", "pl": "..."}, "region": "..."}],
+  "proverb": {"text": "...", "translation": {"pt": "...", "pl": "..."}, "meaning": {"pt": "...", "pl": "..."}},
+  "idiom": {"phrase": "...", "literal": {"pt": "...", "pl": "..."}, "meaning": {"pt": "...", "pl": "..."}, "origin": {"pt": "...", "pl": "..."}, "example_sentence": {"pt": "...", "pl": "..."}}
+}
+
+Remember: this resource must be so good that a learner could use it as their primary reference for this topic.`,
+      },
+    ],
+    response_format: { type: "json_object" },
+    // OpenRouter extensions: heal malformed JSON; route only to JSON-capable providers
+    plugins: [{ id: "response-healing" }],
+    provider: { require_parameters: true },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  } as any);
+
+  const portugueseText = response.choices[0]?.message?.content;
+  if (!portugueseText) throw new Error("Empty response from API");
+
+  const data = tryParseJSON(portugueseText);
+
+  // Validate required fields
+  const REQUIRED = ['topic','subtitle','emoji','tags','difficulty_level','introduction','key_takeaways','grammar','common_mistakes','useful_phrases','mini_story','dialogue','closing_reflection','culture','cultural_notes','proverb','idiom'];
+  const missing = findMissingRequiredFields(data, REQUIRED);
+  if (missing.length > 0) {
+    throw new Error(`Incomplete lesson JSON — missing fields: ${missing.join(', ')}`);
+  }
+
+  // Normalize difficulty level to single CEFR code
+  data.difficulty_level = normalizeDifficultyLevel(data.difficulty_level);
+
+  // Generate vocabulary as a separate request with full lesson context
+  const vocabulary = await generatePortugueseVocabulary(data, apiKey, model || getSavedModel() || DEFAULT_MODEL, client);
+
+  return {
+    ...data,
+    vocabulary,
+    id: typeof crypto !== "undefined" && crypto.randomUUID
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+    timestamp: Date.now(),
+    targetLang: 'pt' as const,
+  } as Lesson;
+};
+
+// ─── Portuguese Vocabulary Generation ────────────────────────────────────────
+
+async function generatePortugueseVocabulary(
+  lessonData: Record<string, unknown>,
+  apiKey: string,
+  model: string,
+  client?: OpenAI
+): Promise<import('../types').VocabularyItem[]> {
+  const c = client ?? new OpenAI({ baseURL: "https://openrouter.ai/api/v1", apiKey, dangerouslyAllowBrowser: true });
+
+  const lessonSummary = JSON.stringify({
+    topic: lessonData.topic,
+    tags: lessonData.tags,
+    difficulty_level: lessonData.difficulty_level,
+    introduction: lessonData.introduction,
+    deep_dive: lessonData.deep_dive,
+    grammar: lessonData.grammar,
+    mini_story: lessonData.mini_story,
+    dialogue: lessonData.dialogue,
+  });
+
+  const ptVocabResponse = await c.chat.completions.create({
+    model,
+    messages: [
+      {
+        role: "system",
+        content: `You are a specialist European Portuguese lexicographer and vocabulary teacher for Polish speakers. You create precise, detailed, encyclopedic vocabulary entries for language learners. Your entries are accurate, pedagogically rich, and directly relevant to the topic at hand. Pay special attention to Portuguese noun genders (masculine/feminine), the distinction between ser and estar, verbal conjugation patterns (including irregular verbs), nasal vowels (ã, ẽ, õ, ão, ãe), and the European Portuguese pronunciation features that differ from Brazilian Portuguese (unstressed vowel reduction, final -e dropping, palatalization). Always use European Portuguese spelling and pronunciation.`,
+      },
+      {
+        role: "user",
+        content: `Based on the following Portuguese lesson content, generate a vocabulary list of EXACTLY 15 to 25 items (no fewer than 15, no more than 25). Choose the most important, topic-relevant Portuguese words and phrases — a mix of nouns, verbs, adjectives, adverbs, and set phrases.
+
+LESSON CONTENT:
+${lessonSummary}
+
+For each vocabulary item provide:
+- word: the Portuguese word/phrase (for nouns include the definite article to show gender: "o/a")
+- ipa: full IPA phonetic transcription using European Portuguese pronunciation (include nasal vowels, reduced unstressed vowels)
+- gender: "m" (masculine), "f" (feminine), "pl" for plural-only nouns; use "invariant" for verbs/adjectives/adverbs
+- plural: plural form (for nouns, include any spelling changes)
+- part_of_speech: one of noun|verb|adjective|adverb|phrase|interjection|conjunction|preposition
+- register: one of formal|informal|colloquial|literary|regional|vulgar
+- translation: Polish translation
+- definition: {"pt": "2-3 sentence definition in European Portuguese", "pl": "2-3 sentence definition in Polish"}
+- context_sentence: {"pt": "A vivid European Portuguese example sentence", "pl": "Polish translation"}
+- audio_hint: pronunciation tip for Polish speakers (e.g. nasal vowels ão/ã/ẽ, unstressed -e dropping in EP, -lh- = /ʎ/ like Polish 'l' before soft vowels, -nh- = /ɲ/ like Polish 'ń', the difference between EP and BP pronunciation, stress patterns)
+- etymology: {"pt": "etymology in Portuguese", "pl": "etymology in Polish"}
+- synonyms: array of 3-4 Portuguese synonyms
+- antonyms: array of 2-3 Portuguese antonyms
+- word_family: array of 3-4 related forms: [{"form": "...", "type": "...", "translation": "..."}]
+
+CRITICAL: Respond with ONLY a raw JSON object:
+{
+  "vocabulary": [
+    {
+      "word": "...", "ipa": "...", "gender": "m|f|pl|invariant", "plural": "...",
+      "part_of_speech": "noun|verb|...", "register": "formal|informal|...",
+      "translation": "...",
+      "definition": {"pt": "...", "pl": "..."},
+      "context_sentence": {"pt": "...", "pl": "..."},
+      "audio_hint": "...",
+      "etymology": {"pt": "...", "pl": "..."},
+      "synonyms": ["...", "..."], "antonyms": ["...", "..."],
+      "word_family": [{"form": "...", "type": "...", "translation": "..."}]
+    }
+  ]
+}`,
+      },
+    ],
+    response_format: { type: "json_object" },
+    // OpenRouter extensions: heal malformed JSON; route only to JSON-capable providers
+    plugins: [{ id: "response-healing" }],
+    provider: { require_parameters: true },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  } as any);
+
+  const ptVocabText = ptVocabResponse.choices[0]?.message?.content;
+  if (!ptVocabText) return [];
+  try {
+    const parsed = JSON.parse(ptVocabText);
+    return parsed.vocabulary ?? [];
+  } catch {
+    return [];
+  }
+}
