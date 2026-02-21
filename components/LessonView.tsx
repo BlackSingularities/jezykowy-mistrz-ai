@@ -614,9 +614,7 @@ export const LessonView: React.FC<LessonViewProps> = ({ lesson, onBack, onChange
     setGeneratingExercises(true);
     setExerciseGenError('');
     try {
-      const apiKey = localStorage.getItem('openrouter_api_key') || '';
-      if (!apiKey) { setExerciseGenError('Brak klucza API'); return; }
-      const set = await generateExercises(lesson, apiKey, undefined, exerciseCount);
+      const set = await generateExercises(lesson, undefined, undefined, exerciseCount);
       await saveExerciseSet(set);
       setExerciseSet(set);
       setExerciseLoadStatus('loaded');
@@ -634,9 +632,7 @@ export const LessonView: React.FC<LessonViewProps> = ({ lesson, onBack, onChange
     setGeneratingMoreExercises(true);
     setExerciseGenError('');
     try {
-      const apiKey = localStorage.getItem('openrouter_api_key') || '';
-      if (!apiKey) { setExerciseGenError('Brak klucza API'); return; }
-      const updatedSet = await appendExercises(lesson, exerciseSet, moreCount, apiKey);
+      const updatedSet = await appendExercises(lesson, exerciseSet, moreCount);
       await saveExerciseSet(updatedSet);
       setExerciseSet(updatedSet);
     } catch (err: unknown) {
