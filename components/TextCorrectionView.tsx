@@ -7,7 +7,7 @@ import {
   ClipboardDocumentIcon,
 } from '@heroicons/react/24/outline';
 import { CheckCircleIcon as CheckCircleSolid, ExclamationCircleIcon } from '@heroicons/react/24/solid';
-import type { CorrectionResult, DetailedCorrectionResult } from '../services/geminiService';
+import type { CorrectionResult, DetailedCorrectionResult } from '../services/aiService';
 import { useLang, useTheme } from '../context/LangContext';
 import { Flag } from './Flag';
 import type { TargetLang } from '../types';

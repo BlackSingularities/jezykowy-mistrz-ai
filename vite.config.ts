@@ -115,7 +115,7 @@ async function processJob(job: ServerJob, server: any): Promise<void> {
   writeJob({ ...job, status: 'running', updatedAt: Date.now() });
   try {
     // Use Vite's SSR module loader to transform & execute TypeScript
-    const mod = await server.ssrLoadModule('/services/geminiService.ts');
+    const mod = await server.ssrLoadModule('/services/aiService.ts');
 
     const genFn = job.targetLang === 'en'
       ? mod.generateEnglishLesson
@@ -484,7 +484,7 @@ function historyApiPlugin() {
             res.end(JSON.stringify({ error: 'API key not configured' }));
             return;
           }
-          const mod = await server.ssrLoadModule('/services/geminiService.ts');
+          const mod = await server.ssrLoadModule('/services/aiService.ts');
           const list = await mod.loadModels(cfg.apiKey);
           modelsCache = { data: list, fetchedAt: Date.now() };
           res.end(JSON.stringify(list));
@@ -517,7 +517,7 @@ function historyApiPlugin() {
               res.end(JSON.stringify({ error: 'API key not configured' }));
               return;
             }
-            const mod = await server.ssrLoadModule('/services/geminiService.ts');
+            const mod = await server.ssrLoadModule('/services/aiService.ts');
             const result = await mod.correctText(text, lang, mode, cfg.apiKey, cfg.model ?? '');
             res.end(JSON.stringify(result));
           } catch (err: any) {

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, FormEvent, useCallback } from 'react';
 import { createRoot } from 'react-dom/client';
-import { getSavedModel, saveModel, ORModel } from './services/geminiService';
+import { getSavedModel, saveModel, ORModel } from './services/aiService';
 import { LessonView, getFavorites, toggleFavorite } from './components/LessonView';
 import { ExercisesView } from './components/ExercisesView';
 import { TextCorrectionView } from './components/TextCorrectionView';
