@@ -5,7 +5,10 @@
       "Bash(npx tsc:*)",
       "Bash(del \"H:\\\\Piaskownica\\\\!!Githubownik\\\\wloski-mistrz-ai\\\\components\\\\QuizSection.tsx\")",
       "WebFetch(domain:openrouter.ai)",
-      "Bash(npm run build:*)"
+      "Bash(npm run build:*)",
+      "Bash(python:*)",
+      "Bash(python3:*)",
+      "Bash(npx vite build:*)"
     ]
   }
 }

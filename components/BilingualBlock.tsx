@@ -57,6 +57,7 @@ export function BilingualBlock<T extends ElementType = 'span'>({
     triggerSwitch(localLang === 'pl' ? targetLang : 'pl');
   };
 
+  if (!content) return null;
   const text = localLang === 'pl'
     ? content.pl
     : (targetLang === 'en' ? content.en : targetLang === 'fr' ? content.fr : targetLang === 'es' ? content.es : targetLang === 'de' ? content.de : targetLang === 'cs' ? content.cs : targetLang === 'ru' ? content.ru : targetLang === 'pt' ? content.pt : targetLang === 'el' ? content.el : content.it) ?? content.pl;

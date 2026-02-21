@@ -23,7 +23,7 @@ import {
   ExclamationCircleIcon,
   AcademicCapIcon,
 } from '@heroicons/react/24/solid';
-import { LanguageIcon, SunIcon, MoonIcon, ArrowPathIcon, StarIcon as StarOutlineIcon, ArrowLeftIcon, PhotoIcon, XCircleIcon, PencilSquareIcon } from '@heroicons/react/24/outline';
+import { LanguageIcon, SunIcon, MoonIcon, ArrowPathIcon, StarIcon as StarOutlineIcon, ArrowLeftIcon, PhotoIcon, XCircleIcon, PencilSquareIcon, Cog6ToothIcon } from '@heroicons/react/24/outline';
 
 // ─── Queue types ──────────────────────────────────────────────────────────────
 
@@ -506,6 +506,181 @@ const ChangeKeyModal: React.FC<{ onClose: () => void; onSave: (key: string) => v
   );
 };
 
+// ─── Settings Panel ────────────────────────────────────────────────────────────
+
+const SettingsPanel: React.FC<{
+  open: boolean;
+  onClose: () => void;
+  onChangeKey: () => void;
+  lang: 'it' | 'pl' | 'en' | 'fr' | 'es' | 'de' | 'cs' | 'ru' | 'pt' | 'el';
+  activeModel?: string;
+  onModelChange?: (id: string) => void;
+}> = ({ open, onClose, onChangeKey, lang: l, activeModel, onModelChange }) => {
+  const { theme, toggleTheme } = useTheme();
+  const { fontSizeIndex, increaseFontSize, decreaseFontSize } = useFontSize();
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (panelRef.current && !panelRef.current.contains(e.target as Node)) onClose();
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open, onClose]);
+
+  const T = {
+    settings:  l === 'pl' ? 'Ustawienia'           : l === 'en' ? 'Settings'       : l === 'fr' ? 'Paramètres'      : l === 'es' ? 'Ajustes'          : l === 'de' ? 'Einstellungen'   : l === 'cs' ? 'Nastavení'    : l === 'ru' ? 'Настройки'    : l === 'pt' ? 'Definições'   : l === 'el' ? 'Ρυθμίσεις'  : 'Impostazioni',
+    aiModel:   l === 'pl' ? 'Model AI'              : l === 'en' ? 'AI Model'       : l === 'fr' ? 'Modèle IA'       : l === 'es' ? 'Modelo IA'        : l === 'de' ? 'KI-Modell'       : l === 'cs' ? 'Model AI'     : l === 'ru' ? 'Модель ИИ'    : l === 'pt' ? 'Modelo IA'    : l === 'el' ? 'Μοντέλο ΑΙ' : 'Modello AI',
+    theme:     l === 'pl' ? 'Motyw'                 : l === 'en' ? 'Theme'          : l === 'fr' ? 'Thème'            : l === 'es' ? 'Tema'             : l === 'de' ? 'Design'          : l === 'cs' ? 'Motiv'        : l === 'ru' ? 'Тема'         : l === 'pt' ? 'Tema'         : l === 'el' ? 'Θέμα'       : 'Tema',
+    light:     l === 'pl' ? 'Jasny'                 : l === 'en' ? 'Light'          : l === 'fr' ? 'Clair'            : l === 'es' ? 'Claro'            : l === 'de' ? 'Hell'            : 'Light',
+    dark:      l === 'pl' ? 'Ciemny'                : l === 'en' ? 'Dark'           : l === 'fr' ? 'Sombre'           : l === 'es' ? 'Oscuro'           : l === 'de' ? 'Dunkel'          : 'Dark',
+    fontSize:  l === 'pl' ? 'Rozmiar tekstu'        : l === 'en' ? 'Text size'      : l === 'fr' ? 'Taille du texte'  : l === 'es' ? 'Tamaño de texto'  : l === 'de' ? 'Textgröße'       : l === 'cs' ? 'Velikost textu': l === 'ru' ? 'Размер текста': l === 'pt' ? 'Tamanho do texto': l === 'el' ? 'Μέγεθος κειμένου': 'Dimensione testo',
+    apiKey:    l === 'pl' ? 'Klucz API'             : l === 'en' ? 'API Key'        : l === 'fr' ? 'Clé API'          : l === 'es' ? 'Clave API'        : l === 'de' ? 'API-Schlüssel'   : l === 'cs' ? 'API klíč'     : l === 'ru' ? 'API ключ'     : l === 'pt' ? 'Chave API'    : l === 'el' ? 'Κλειδί API' : 'Chiave API',
+    changeKey: l === 'pl' ? 'Zmień klucz OpenRouter': l === 'en' ? 'Change OpenRouter key': l === 'fr' ? 'Changer la clé OpenRouter': l === 'es' ? 'Cambiar clave OpenRouter': l === 'de' ? 'OpenRouter-Schlüssel ändern': 'Cambia chiave OpenRouter',
+  };
+
+  const FONT_STEPS = ['XS', 'S', 'M', 'L', 'XL'];
+
+  return (
+    <>
+      {/* Backdrop */}
+      <div
+        className="fixed inset-0 z-40"
+        style={{
+          background: 'rgba(0,0,0,.3)',
+          backdropFilter: 'blur(2px)',
+          opacity: open ? 1 : 0,
+          pointerEvents: open ? 'all' : 'none',
+          transition: 'opacity .2s ease',
+        }}
+        onClick={onClose}
+      />
+
+      {/* Sliding panel */}
+      <div
+        ref={panelRef}
+        className="fixed top-0 right-0 h-full z-50 flex flex-col"
+        style={{
+          width: '300px',
+          transform: open ? 'translateX(0)' : 'translateX(100%)',
+          transition: 'transform .25s cubic-bezier(.4,0,.2,1)',
+          background: 'var(--c-surface)',
+          borderLeft: '1px solid var(--c-border)',
+          boxShadow: '-8px 0 40px rgba(0,0,0,.18)',
+        }}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b shrink-0" style={{ borderColor: 'var(--c-border)' }}>
+          <div className="flex items-center gap-2">
+            <Cog6ToothIcon className="w-4 h-4" style={{ color: 'var(--c-green)' }} />
+            <h2 className="font-serif font-bold text-sm">{T.settings}</h2>
+          </div>
+          <button onClick={onClose} className="nav-icon-btn">
+            <XMarkIcon className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto px-5 py-5 space-y-6">
+
+          {/* Model AI */}
+          {activeModel && onModelChange && (
+            <div className="space-y-2">
+              <p className="micro-label">{T.aiModel}</p>
+              <ModelPicker activeModel={activeModel} onChange={onModelChange} lang={l} />
+            </div>
+          )}
+
+          {/* Separator */}
+          {activeModel && <div className="border-t" style={{ borderColor: 'var(--c-border-soft)' }} />}
+
+          {/* Motyw */}
+          <div className="space-y-2">
+            <p className="micro-label">{T.theme}</p>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={() => { if (theme !== 'light') toggleTheme(); }}
+                className="flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg text-xs font-semibold border transition-all"
+                style={{
+                  background: theme === 'light' ? 'var(--c-text)' : 'transparent',
+                  color: theme === 'light' ? '#fff' : 'var(--c-muted)',
+                  borderColor: theme === 'light' ? 'transparent' : 'var(--c-border)',
+                }}
+              >
+                <SunIcon className="w-3.5 h-3.5" />{T.light}
+              </button>
+              <button
+                onClick={() => { if (theme !== 'dark') toggleTheme(); }}
+                className="flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg text-xs font-semibold border transition-all"
+                style={{
+                  background: theme === 'dark' ? 'var(--c-text)' : 'transparent',
+                  color: theme === 'dark' ? '#13151b' : 'var(--c-muted)',
+                  borderColor: theme === 'dark' ? 'transparent' : 'var(--c-border)',
+                }}
+              >
+                <MoonIcon className="w-3.5 h-3.5" />{T.dark}
+              </button>
+            </div>
+          </div>
+
+          <div className="border-t" style={{ borderColor: 'var(--c-border-soft)' }} />
+
+          {/* Rozmiar czcionki */}
+          <div className="space-y-3">
+            <p className="micro-label">{T.fontSize}</p>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={decreaseFontSize}
+                disabled={fontSizeIndex === 0}
+                className="nav-icon-btn shrink-0 disabled:opacity-30"
+                style={{ width: 34, height: 34, fontSize: 11 }}
+              >
+                A<sup style={{ fontSize: 7 }}>−</sup>
+              </button>
+              <div className="flex-1 flex gap-1">
+                {FONT_STEPS.map((_, i) => (
+                  <div
+                    key={i}
+                    className="flex-1 h-1.5 rounded-full transition-colors"
+                    style={{ background: i <= fontSizeIndex ? 'var(--c-green)' : 'var(--c-border)' }}
+                  />
+                ))}
+              </div>
+              <button
+                onClick={increaseFontSize}
+                disabled={fontSizeIndex === 4}
+                className="nav-icon-btn shrink-0 disabled:opacity-30"
+                style={{ width: 34, height: 34, fontSize: 14 }}
+              >
+                A<sup style={{ fontSize: 9 }}>+</sup>
+              </button>
+            </div>
+            <p className="text-center text-xs" style={{ color: 'var(--c-faint)' }}>
+              {FONT_STEPS[fontSizeIndex]}
+            </p>
+          </div>
+
+          <div className="border-t" style={{ borderColor: 'var(--c-border-soft)' }} />
+
+          {/* Klucz API */}
+          <div className="space-y-2">
+            <p className="micro-label">{T.apiKey}</p>
+            <button
+              onClick={() => { onChangeKey(); onClose(); }}
+              className="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-xs font-medium border transition-colors"
+              style={{ background: 'var(--c-bg)', borderColor: 'var(--c-border)', color: 'var(--c-text)' }}
+            >
+              <KeyIcon className="w-3.5 h-3.5 shrink-0" style={{ color: 'var(--c-green)' }} />
+              {T.changeKey}
+            </button>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+};
+
 // ─── Inner App ────────────────────────────────────────────────────────────────
 
 const DIFF_LEVELS = ['A1', 'A2', 'B1', 'B2', 'C1'] as const;
@@ -516,8 +691,7 @@ const AppInner: React.FC<{
   onChangeLang: (lang: TargetLang) => void;
 }> = ({ onChangeKey, onBackToHome, onChangeLang }) => {
   const { globalLang, toggleGlobal, targetLang } = useLang();
-  const { theme, toggleTheme } = useTheme();
-  const { fontSizeIndex, increaseFontSize, decreaseFontSize } = useFontSize();
+  const { theme } = useTheme();
   const isEs = targetLang === 'es';
   const isDe = targetLang === 'de';
   const isCs = targetLang === 'cs';
@@ -540,6 +714,7 @@ const AppInner: React.FC<{
   const [showFavsOnly, setShowFavsOnly] = useState(false);
   const [favSet, setFavSet] = useState<Set<string>>(() => getFavorites());
   const [currentPage, setCurrentPage] = useState(1);
+  const [showSettings, setShowSettings] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const ITEMS_PER_PAGE = 20;
@@ -912,55 +1087,6 @@ const AppInner: React.FC<{
             </div>
           </div>
           <div className="flex items-center gap-1 ml-auto">
-            <ModelPicker
-              activeModel={activeModel}
-              onChange={handleModelChange}
-              lang={l}
-            />
-            {/* Rozmiar czcionki */}
-            <div className="flex items-center rounded-full border overflow-hidden" style={{ borderColor: 'var(--c-border)', background: 'var(--c-surface)' }}>
-              <button
-                onClick={decreaseFontSize}
-                disabled={fontSizeIndex === 0}
-                title="Mniejsza czcionka"
-                className="nav-icon-btn rounded-none border-0 disabled:opacity-30"
-                style={{ width: 30, height: 30, fontSize: 11 }}
-              >
-                A<sup style={{ fontSize: 7 }}>−</sup>
-              </button>
-              <div className="w-px h-4 shrink-0" style={{ background: 'var(--c-border)' }} />
-              <button
-                onClick={increaseFontSize}
-                disabled={fontSizeIndex === 4}
-                title="Większa czcionka"
-                className="nav-icon-btn rounded-none border-0 disabled:opacity-30"
-                style={{ width: 30, height: 30, fontSize: 13 }}
-              >
-                A<sup style={{ fontSize: 8 }}>+</sup>
-              </button>
-            </div>
-            {/* Język */}
-            <button
-              onClick={toggleGlobal}
-              title={L.langToggle}
-              className="nav-icon-btn font-bold text-xs"
-              style={{ background: 'var(--c-text)', color: theme === 'dark' ? '#13151b' : '#fff', width: 'auto', padding: '0 10px', gap: 4 }}
-            >
-              <LanguageIcon className="w-3.5 h-3.5 shrink-0" />
-              <span>{l === 'pl' ? 'PL' : l === 'en' ? 'EN' : l === 'fr' ? 'FR' : l === 'es' ? 'ES' : l === 'de' ? 'DE' : l === 'cs' ? 'CS' : l === 'ru' ? 'RU' : l === 'pt' ? 'PT' : l === 'el' ? 'EL' : 'IT'}</span>
-              <LangFlag lang={l} size={14} />
-            </button>
-            {/* Motyw */}
-            <button
-              onClick={toggleTheme}
-              title={theme === 'dark' ? 'Tryb jasny' : 'Tryb ciemny'}
-              className="nav-icon-btn"
-            >
-              {theme === 'dark'
-                ? <SunIcon className="w-4 h-4 theme-icon-enter" />
-                : <MoonIcon className="w-4 h-4 theme-icon-enter" />
-              }
-            </button>
             {/* Korektor tekstu */}
             <button
               onClick={() => setShowTextCorrection(true)}
@@ -985,13 +1111,24 @@ const AppInner: React.FC<{
                 {l === 'pl' ? 'Ćwiczenia' : l === 'en' ? 'Exercises' : l === 'fr' ? 'Exercices' : l === 'es' ? 'Ejercicios' : l === 'de' ? 'Übungen' : 'Esercizi'}
               </span>
             </button>
-            {/* Klucz API */}
+            {/* Język */}
             <button
-              onClick={onChangeKey}
-              title={L.apiKey}
+              onClick={toggleGlobal}
+              title={L.langToggle}
+              className="nav-icon-btn font-bold text-xs"
+              style={{ background: 'var(--c-text)', color: theme === 'dark' ? '#13151b' : '#fff', width: 'auto', padding: '0 10px', gap: 4 }}
+            >
+              <LanguageIcon className="w-3.5 h-3.5 shrink-0" />
+              <span>{l === 'pl' ? 'PL' : l === 'en' ? 'EN' : l === 'fr' ? 'FR' : l === 'es' ? 'ES' : l === 'de' ? 'DE' : l === 'cs' ? 'CS' : l === 'ru' ? 'RU' : l === 'pt' ? 'PT' : l === 'el' ? 'EL' : 'IT'}</span>
+              <LangFlag lang={l} size={14} />
+            </button>
+            {/* Ustawienia */}
+            <button
+              onClick={() => setShowSettings(true)}
+              title={l === 'pl' ? 'Ustawienia' : l === 'en' ? 'Settings' : l === 'fr' ? 'Paramètres' : l === 'es' ? 'Ajustes' : l === 'de' ? 'Einstellungen' : 'Impostazioni'}
               className="nav-icon-btn"
             >
-              <KeyIcon className="w-3.5 h-3.5" />
+              <Cog6ToothIcon className="w-4 h-4" />
             </button>
           </div>
         </div>
@@ -1408,6 +1545,15 @@ const AppInner: React.FC<{
         </div>
       </main>
 
+      <SettingsPanel
+        open={showSettings}
+        onClose={() => setShowSettings(false)}
+        onChangeKey={onChangeKey}
+        lang={l}
+        activeModel={activeModel}
+        onModelChange={handleModelChange}
+      />
+
       <footer className="py-5 border-t"
         style={{ color: 'var(--c-faint)', borderColor: 'var(--c-border)', background: 'var(--c-surface-2)' }}>
         <div className="max-w-screen-2xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
@@ -1429,160 +1575,171 @@ const AppInner: React.FC<{
 
 // ─── Home Screen ──────────────────────────────────────────────────────────────
 
-const HomeScreen: React.FC<{ onSelect: (lang: TargetLang) => void }> = ({ onSelect }) => {
+const LANGS_LIST: Array<{ code: TargetLang; name: string; native: string }> = [
+  { code: 'en', name: 'Angielski',   native: 'English'    },
+  { code: 'fr', name: 'Francuski',   native: 'Français'   },
+  { code: 'es', name: 'Hiszpański',  native: 'Español'    },
+  { code: 'it', name: 'Włoski',      native: 'Italiano'   },
+  { code: 'de', name: 'Niemiecki',   native: 'Deutsch'    },
+  { code: 'cs', name: 'Czeski',      native: 'Čeština'    },
+  { code: 'ru', name: 'Rosyjski',    native: 'Русский'    },
+  { code: 'pt', name: 'Portugalski', native: 'Português'  },
+  { code: 'el', name: 'Grecki',      native: 'Ελληνικά'  },
+];
+
+const HomeScreen: React.FC<{
+  onSelect: (lang: TargetLang) => void;
+  onTextCorrect: () => void;
+  onChangeKey: () => void;
+}> = ({ onSelect, onTextCorrect, onChangeKey }) => {
+  const { theme, toggleTheme } = useTheme();
+  const [showSettings, setShowSettings] = useState(false);
+
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center px-4 gap-10"
-      style={{ background: 'var(--c-bg)', color: 'var(--c-text)' }}>
-      <div className="text-center space-y-3">
-        <div className="flex gap-1.5 justify-center mb-2">
-          <div className="w-3 h-3 rounded-full" style={{ background: 'var(--c-green)' }} />
-          <div className="w-3 h-3 rounded-full border" style={{ borderColor: 'var(--c-border)' }} />
-          <div className="w-3 h-3 rounded-full" style={{ background: 'var(--c-red)' }} />
+    <div className="min-h-screen flex flex-col" style={{ background: 'var(--c-bg)', color: 'var(--c-text)' }}>
+
+      {/* Top nav */}
+      <nav className="glass-nav sticky top-0 z-50">
+        <div className="max-w-screen-lg mx-auto px-4 h-12 flex items-center justify-between gap-2">
+          {/* Logo */}
+          <div className="flex items-center gap-2.5">
+            <div className="flex gap-1 shrink-0">
+              <div className="w-2.5 h-2.5 rounded-full" style={{ background: 'var(--c-green)' }} />
+              <div className="w-2.5 h-2.5 rounded-full border" style={{ borderColor: 'var(--c-border)' }} />
+              <div className="w-2.5 h-2.5 rounded-full" style={{ background: 'var(--c-red)' }} />
+            </div>
+            <span className="font-serif font-bold text-base tracking-tight hidden sm:inline" style={{ color: 'var(--c-text)' }}>
+              Językowy Mistrz AI
+            </span>
+          </div>
+          {/* Actions */}
+          <div className="flex items-center gap-1">
+            <button
+              onClick={onTextCorrect}
+              className="nav-icon-btn hidden sm:flex"
+              style={{ width: 'auto', padding: '0 10px', gap: 4 }}
+              title="Korektor tekstu"
+            >
+              <PencilSquareIcon className="w-3.5 h-3.5" />
+              <span className="text-xs font-medium">Korektor</span>
+            </button>
+            <button
+              onClick={toggleTheme}
+              className="nav-icon-btn"
+              title={theme === 'dark' ? 'Tryb jasny' : 'Tryb ciemny'}
+            >
+              {theme === 'dark'
+                ? <SunIcon className="w-4 h-4 theme-icon-enter" />
+                : <MoonIcon className="w-4 h-4 theme-icon-enter" />}
+            </button>
+            <button
+              onClick={() => setShowSettings(true)}
+              className="nav-icon-btn"
+              title="Ustawienia"
+            >
+              <Cog6ToothIcon className="w-4 h-4" />
+            </button>
+          </div>
         </div>
-        <h1 className="text-4xl md:text-5xl font-serif font-bold tracking-tight">
-          <span className="hero-gradient">Językowy Mistrz AI</span>
-        </h1>
-        <p className="text-sm" style={{ color: 'var(--c-muted)' }}>
-          Wybierz język, którego chcesz się uczyć
+      </nav>
+
+      {/* Main */}
+      <main className="flex-1 flex flex-col items-center justify-center px-4 py-10">
+        <div className="w-full max-w-4xl space-y-10">
+
+          {/* Hero */}
+          <div className="text-center space-y-4">
+            <div
+              className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold"
+              style={{ background: 'var(--c-surface)', border: '1px solid var(--c-border)', color: 'var(--c-muted)' }}
+            >
+              <SparklesIcon className="w-3 h-3 shrink-0" style={{ color: 'var(--c-green)' }} />
+              Powered by OpenRouter AI
+            </div>
+            <h1 className="text-4xl md:text-5xl font-serif font-bold tracking-tight leading-tight">
+              <span className="hero-gradient">Językowy Mistrz AI</span>
+            </h1>
+            <p className="text-sm max-w-sm mx-auto leading-relaxed" style={{ color: 'var(--c-muted)' }}>
+              Ucz się języków obcych z pomocą sztucznej inteligencji. Artykuły, lekcje i ćwiczenia dopasowane do Twojego poziomu.
+            </p>
+          </div>
+
+          {/* Language picker */}
+          <div>
+            <p className="micro-label text-center mb-4" style={{ letterSpacing: '0.1em' }}>
+              Wybierz język do nauki
+            </p>
+            <div className="grid grid-cols-3 sm:grid-cols-5 gap-3">
+              {LANGS_LIST.map(({ code, name, native }) => (
+                <button
+                  key={code}
+                  onClick={() => onSelect(code)}
+                  className="group card card-hover py-5 px-2 flex flex-col items-center gap-2 transition-all"
+                >
+                  <Flag code={code} size={36} />
+                  <div className="text-center">
+                    <p className="font-semibold text-xs leading-tight" style={{ color: 'var(--c-text)' }}>{name}</p>
+                    <p className="text-[10px] mt-0.5 italic" style={{ color: 'var(--c-faint)' }}>{native}</p>
+                  </div>
+                  <span
+                    className="text-[10px] font-bold opacity-0 group-hover:opacity-100 transition-opacity -mt-1"
+                    style={{ color: 'var(--c-green)' }}
+                  >
+                    Wybierz →
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Text corrector CTA */}
+          <div
+            className="relative overflow-hidden rounded-2xl"
+            style={{ background: 'var(--c-surface)', border: '1px solid var(--c-border)' }}
+          >
+            <div
+              className="absolute -right-12 -top-12 w-48 h-48 rounded-full pointer-events-none"
+              style={{ background: 'radial-gradient(circle, var(--c-green-dim, rgba(52,211,153,.12)) 0%, transparent 70%)' }}
+            />
+            <div className="relative flex flex-col sm:flex-row items-center gap-5 px-6 py-6">
+              <div className="shrink-0 w-12 h-12 rounded-xl flex items-center justify-center"
+                style={{ background: 'var(--c-green-dim, rgba(52,211,153,.15))' }}>
+                <PencilSquareIcon className="w-6 h-6" style={{ color: 'var(--c-green)' }} />
+              </div>
+              <div className="flex-1 text-center sm:text-left">
+                <h2 className="font-serif font-bold text-base">Korektor tekstu AI</h2>
+                <p className="text-xs mt-0.5 leading-relaxed" style={{ color: 'var(--c-muted)' }}>
+                  Sprawdź poprawność gramatyczną, stylistyczną i ortograficzną tekstu w dowolnym języku.
+                </p>
+              </div>
+              <button
+                onClick={onTextCorrect}
+                className="shrink-0 flex items-center gap-2 px-5 py-2.5 rounded-full text-xs font-semibold transition-all active:scale-95 whitespace-nowrap"
+                style={{ background: 'var(--c-text)', color: theme === 'dark' ? '#13151b' : '#fff' }}
+              >
+                <PencilSquareIcon className="w-3.5 h-3.5" />
+                Otwórz korektor
+              </button>
+            </div>
+          </div>
+
+        </div>
+      </main>
+
+      {/* Footer */}
+      <footer className="py-4 border-t" style={{ borderColor: 'var(--c-border)', background: 'var(--c-surface-2)' }}>
+        <p className="text-center text-xs" style={{ color: 'var(--c-faint)' }}>
+          Językowy Mistrz AI &copy; 2025 · Powered by OpenRouter
         </p>
-      </div>
+      </footer>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 gap-5 w-full max-w-4xl">
-        {/* Angielski */}
-        <button
-          onClick={() => onSelect('en')}
-          className="group card card-hover p-6 flex flex-col items-center gap-3 transition-all"
-        >
-          <Flag code="en" size={48} />
-          <div className="text-center">
-            <p className="font-serif font-bold text-lg" style={{ color: 'var(--c-text)' }}>Angielski</p>
-            <p className="text-xs mt-0.5" style={{ color: 'var(--c-muted)' }}>Polsko-angielski</p>
-          </div>
-          <span className="text-xs font-semibold group-hover:translate-x-1 transition-transform" style={{ color: 'var(--c-green)' }}>
-            Wybierz →
-          </span>
-        </button>
-
-        {/* Francuski */}
-        <button
-          onClick={() => onSelect('fr')}
-          className="group card card-hover p-6 flex flex-col items-center gap-3 transition-all"
-        >
-          <Flag code="fr" size={48} />
-          <div className="text-center">
-            <p className="font-serif font-bold text-lg" style={{ color: 'var(--c-text)' }}>Francuski</p>
-            <p className="text-xs mt-0.5" style={{ color: 'var(--c-muted)' }}>Polsko-francuski</p>
-          </div>
-          <span className="text-xs font-semibold group-hover:translate-x-1 transition-transform" style={{ color: 'var(--c-green)' }}>
-            Wybierz →
-          </span>
-        </button>
-
-        {/* Hiszpański */}
-        <button
-          onClick={() => onSelect('es')}
-          className="group card card-hover p-6 flex flex-col items-center gap-3 transition-all"
-        >
-          <Flag code="es" size={48} />
-          <div className="text-center">
-            <p className="font-serif font-bold text-lg" style={{ color: 'var(--c-text)' }}>Hiszpański</p>
-            <p className="text-xs mt-0.5" style={{ color: 'var(--c-muted)' }}>Polsko-hiszpański</p>
-          </div>
-          <span className="text-xs font-semibold group-hover:translate-x-1 transition-transform" style={{ color: 'var(--c-green)' }}>
-            Wybierz →
-          </span>
-        </button>
-
-        {/* Włoski */}
-        <button
-          onClick={() => onSelect('it')}
-          className="group card card-hover p-6 flex flex-col items-center gap-3 transition-all"
-        >
-          <Flag code="it" size={48} />
-          <div className="text-center">
-            <p className="font-serif font-bold text-lg" style={{ color: 'var(--c-text)' }}>Włoski</p>
-            <p className="text-xs mt-0.5" style={{ color: 'var(--c-muted)' }}>Polsko-włoski</p>
-          </div>
-          <span className="text-xs font-semibold group-hover:translate-x-1 transition-transform" style={{ color: 'var(--c-green)' }}>
-            Wybierz →
-          </span>
-        </button>
-
-        {/* Niemiecki */}
-        <button
-          onClick={() => onSelect('de')}
-          className="group card card-hover p-6 flex flex-col items-center gap-3 transition-all"
-        >
-          <Flag code="de" size={48} />
-          <div className="text-center">
-            <p className="font-serif font-bold text-lg" style={{ color: 'var(--c-text)' }}>Niemiecki</p>
-            <p className="text-xs mt-0.5" style={{ color: 'var(--c-muted)' }}>Polsko-niemiecki</p>
-          </div>
-          <span className="text-xs font-semibold group-hover:translate-x-1 transition-transform" style={{ color: 'var(--c-green)' }}>
-            Wybierz →
-          </span>
-        </button>
-
-        {/* Czeski */}
-        <button
-          onClick={() => onSelect('cs')}
-          className="group card card-hover p-6 flex flex-col items-center gap-3 transition-all"
-        >
-          <Flag code="cs" size={48} />
-          <div className="text-center">
-            <p className="font-serif font-bold text-lg" style={{ color: 'var(--c-text)' }}>Czeski</p>
-            <p className="text-xs mt-0.5" style={{ color: 'var(--c-muted)' }}>Polsko-czeski</p>
-          </div>
-          <span className="text-xs font-semibold group-hover:translate-x-1 transition-transform" style={{ color: 'var(--c-green)' }}>
-            Wybierz →
-          </span>
-        </button>
-
-        {/* Rosyjski */}
-        <button
-          onClick={() => onSelect('ru')}
-          className="group card card-hover p-6 flex flex-col items-center gap-3 transition-all"
-        >
-          <Flag code="ru" size={48} />
-          <div className="text-center">
-            <p className="font-serif font-bold text-lg" style={{ color: 'var(--c-text)' }}>Rosyjski</p>
-            <p className="text-xs mt-0.5" style={{ color: 'var(--c-muted)' }}>Polsko-rosyjski</p>
-          </div>
-          <span className="text-xs font-semibold group-hover:translate-x-1 transition-transform" style={{ color: 'var(--c-green)' }}>
-            Wybierz →
-          </span>
-        </button>
-
-        {/* Portugalski */}
-        <button
-          onClick={() => onSelect('pt')}
-          className="group card card-hover p-6 flex flex-col items-center gap-3 transition-all"
-        >
-          <Flag code="pt" size={48} />
-          <div className="text-center">
-            <p className="font-serif font-bold text-lg" style={{ color: 'var(--c-text)' }}>Portugalski</p>
-            <p className="text-xs mt-0.5" style={{ color: 'var(--c-muted)' }}>Polsko-portugalski</p>
-          </div>
-          <span className="text-xs font-semibold group-hover:translate-x-1 transition-transform" style={{ color: 'var(--c-green)' }}>
-            Wybierz →
-          </span>
-        </button>
-
-        {/* Grecki */}
-        <button
-          onClick={() => onSelect('el')}
-          className="group card card-hover p-6 flex flex-col items-center gap-3 transition-all"
-        >
-          <Flag code="el" size={48} />
-          <div className="text-center">
-            <p className="font-serif font-bold text-lg" style={{ color: 'var(--c-text)' }}>Grecki</p>
-            <p className="text-xs mt-0.5" style={{ color: 'var(--c-muted)' }}>Polsko-grecki</p>
-          </div>
-          <span className="text-xs font-semibold group-hover:translate-x-1 transition-transform" style={{ color: 'var(--c-green)' }}>
-            Wybierz →
-          </span>
-        </button>
-      </div>
+      {/* Settings panel */}
+      <SettingsPanel
+        open={showSettings}
+        onClose={() => setShowSettings(false)}
+        onChangeKey={onChangeKey}
+        lang="pl"
+      />
     </div>
   );
 };
@@ -1593,10 +1750,9 @@ const App: React.FC = () => {
   // Trzy stany: null = ładowanie, false = brak klucza, true = klucz ustawiony
   const [hasKey, setHasKey] = useState<boolean | null>(null);
   const [showKeyModal, setShowKeyModal] = useState(false);
-  const [targetLang, setTargetLang] = useState<TargetLang | null>(() => {
-    const saved = localStorage.getItem(APP_MODE_KEY) as TargetLang | null;
-    return saved === 'it' || saved === 'en' || saved === 'fr' || saved === 'es' || saved === 'de' || saved === 'cs' || saved === 'ru' || saved === 'pt' || saved === 'el' ? saved : null;
-  });
+  const [showHomeCorrectorModal, setShowHomeCorrectorModal] = useState(false);
+  // Zawsze startuje od strony głównej (targetLang = null)
+  const [targetLang, setTargetLang] = useState<TargetLang | null>(null);
 
   // Przy starcie: sprawdź konfigurację serwera (klucz API, model)
   useEffect(() => {
@@ -1662,7 +1818,17 @@ const App: React.FC = () => {
   if (!targetLang) {
     return (
       <LangProvider targetLang="it">
-        <HomeScreen onSelect={selectLang} />
+        {showKeyModal && (
+          <ChangeKeyModal onClose={() => setShowKeyModal(false)} onSave={saveApiKey} />
+        )}
+        {showHomeCorrectorModal && (
+          <TextCorrectionView onClose={() => setShowHomeCorrectorModal(false)} />
+        )}
+        <HomeScreen
+          onSelect={selectLang}
+          onTextCorrect={() => setShowHomeCorrectorModal(true)}
+          onChangeKey={() => setShowKeyModal(true)}
+        />
       </LangProvider>
     );
   }

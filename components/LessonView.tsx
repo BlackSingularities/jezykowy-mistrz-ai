@@ -705,14 +705,32 @@ export const LessonView: React.FC<LessonViewProps> = ({ lesson, onBack, onChange
     { id: 'exercises', pl: 'Ćwiczenia',   it: 'Esercizi',   en: 'Exercises',  fr: 'Exercices',   es: 'Ejercicios', de: 'Übungen',    cs: 'Cvičení',  icon: AcademicCapIcon },
   ];
 
+  // Normalizacja linii dialogu — niektóre starsze lekcje mają format {cs:"...", pl:"..."}
+  // zamiast prawidłowego {speaker:"...", text:{cs:"...", pl:"..."}}.
+  const normalizedDialogueLines = useMemo(() => {
+    const lines = lesson.dialogue?.lines ?? [];
+    return lines.map((line, i) => {
+      if (line.speaker !== undefined) return line;
+      // Stary format: cały obiekt to pole Bilingual bez speaker/text
+      const asBilingual = line as unknown as Record<string, string>;
+      return {
+        speaker: i % 2 === 0 ? 'A' : 'B',
+        text: asBilingual,
+        tone: undefined as undefined,
+        annotation: undefined as undefined,
+        grammar_note: undefined as undefined,
+      };
+    });
+  }, [lesson.dialogue?.lines]);
+
   const speakerSides = useMemo<Record<string, 'left' | 'right'>>(() => {
     const map: Record<string, 'left' | 'right'> = {};
     let idx = 0;
-    for (const line of lesson.dialogue?.lines ?? []) {
+    for (const line of normalizedDialogueLines) {
       if (!(line.speaker in map)) { map[line.speaker] = idx % 2 === 0 ? 'left' : 'right'; idx++; }
     }
     return map;
-  }, [lesson.dialogue?.lines]);
+  }, [normalizedDialogueLines]);
 
   const dc = DIFFICULTY_COLOR[lesson.difficulty_level] ?? DIFFICULTY_COLOR.B1;
 
@@ -1321,7 +1339,7 @@ export const LessonView: React.FC<LessonViewProps> = ({ lesson, onBack, onChange
                     )}
                   </div>
                   <SpeakBtn
-                    italianText={lesson.dialogue.lines.map(lin => tl(lin.text)).join('. ')}
+                    italianText={normalizedDialogueLines.map(lin => tl(lin.text)).join('. ')}
                     id="dialogue-full"
                     speak={speak} stop={stop} speakId={speakId}
                     label={L.playDialogue}
@@ -1347,10 +1365,10 @@ export const LessonView: React.FC<LessonViewProps> = ({ lesson, onBack, onChange
               {/* Chat bubbles */}
               <div className="rounded-b-2xl border p-4 md:p-6 space-y-3"
                 style={{ borderColor: 'var(--c-border)', background: 'var(--c-surface-2)', borderTop: 'none' }}>
-                {lesson.dialogue.lines.map((line, i) => {
+                {normalizedDialogueLines.map((line, i) => {
                   const side = speakerSides[line.speaker] ?? 'left';
                   const isRight = side === 'right';
-                  const prevSpeaker = i > 0 ? lesson.dialogue.lines[i - 1].speaker : null;
+                  const prevSpeaker = i > 0 ? normalizedDialogueLines[i - 1].speaker : null;
                   const isNewSpeaker = line.speaker !== prevSpeaker;
 
                   return (
@@ -1369,7 +1387,7 @@ export const LessonView: React.FC<LessonViewProps> = ({ lesson, onBack, onChange
                           {isNewSpeaker ? (
                             <div className="w-8 h-8 rounded-full flex items-center justify-center font-bold text-[10px] shadow-sm text-white"
                               style={{ background: isRight ? 'var(--c-green)' : '#64748b' }}>
-                              {line.speaker.substring(0, 2).toUpperCase()}
+                              {(line.speaker ?? '??').substring(0, 2).toUpperCase()}
                             </div>
                           ) : <div className="w-8 h-8" />}
                         </div>
