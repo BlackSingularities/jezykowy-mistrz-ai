@@ -2376,3 +2376,225 @@ CRITICAL: Respond with ONLY a raw JSON object:
     return [];
   }
 }
+
+// ─── Greek Lesson Generation ──────────────────────────────────────────────────
+
+export const generateGreekLesson = async (topic: string, apiKey: string, model?: string): Promise<Lesson> => {
+  const client = new OpenAI({
+    baseURL: "https://openrouter.ai/api/v1",
+    apiKey,
+    dangerouslyAllowBrowser: true,
+  });
+
+  const response = await client.chat.completions.create({
+    model: model || getSavedModel() || DEFAULT_MODEL,
+    messages: [
+      {
+        role: "system",
+        content: `You are a world-class bilingual (Greek/Polish) editorial expert, cultural authority, and master language educator with 30 years of experience teaching Modern Greek (Νέα Ελληνικά) to Polish speakers.
+
+You produce premium, literary-quality learning resources that feel like an issue of a prestigious culture magazine combined with a rigorous academic reference.
+
+Your guiding principles:
+— DEPTH over brevity: every field must be thorough, substantive, and information-dense. Short answers are a failure.
+— CULTURAL AUTHENTICITY: Greece is the cradle of Western civilization — democracy, philosophy (Socrates, Plato, Aristotle), epic poetry (Homer), theatre, mathematics, and the Olympic Games. Mention Athens, Thessaloniki, Crete, Santorini, the Aegean, Mount Olympus, Byzantine heritage, the Greek Orthodox church, rebetiko music, ouzo, meze, the mezedopoleio, taverna culture, and the richness of Greek mythology and history.
+— LINGUISTIC PRECISION: Modern Greek has a rich nominal system (four cases: nominative, genitive, accusative, vocative; three genders: masculine, feminine, neuter), verb aspects (perfective and imperfective), an augmented verb system, the Greek alphabet (24 letters), diacritical marks (tonos), and a distinction between formal (katharevousa legacy) and informal registers. Note polytonic vs. monotonic orthography.
+— POLISH SPEAKER FOCUS: always identify which Polish structures cause interference. Polish speakers struggle with: the Greek alphabet and its pronunciation, noun case endings (different from Polish cases), verb aspect (similar concept to Polish but expressed differently), the absence of a verb "to have" (χρησιμοποιώ vs. έχω), definite/indefinite articles (Polish has none), and tonal accent. Note helpful shared Latin/Greek roots in Polish scientific and learned vocabulary.
+— LITERARY QUALITY: your Greek must be native Modern Greek (Νέα Ελληνικά), varied, and beautiful. Your Polish must be elegant and precise.
+— MEMORABILITY: every explanation, example, and note should be crafted so a learner will never forget it.
+
+CRITICAL LENGTH REQUIREMENTS — enforce these strictly:
+• introduction: ≥ 6 sentences per language
+• vocabulary definitions: ≥ 2–3 sentences per language each
+• grammar explanations: ≥ 5 sentences per language each
+• grammar examples: ≥ 4 example pairs per grammar point
+• common_mistakes explanations: ≥ 3–4 sentences per language each
+
+• deep_dive: ≥ 250 words per language — in-depth analytical/narrative feature
+• culture content: ≥ 250 words per language
+• cultural_notes content: ≥ 3 sentences per language each
+• mini_story text: ≥ 200 words per language
+• dialogue: ≥ 16 lines total, each utterance 1–3 sentences
+• closing_reflection: ≥ 200 words per language — synthesising closing essay
+• proverb meaning: ≥ 4 sentences per language
+• idiom meaning + origin: ≥ 3 sentences each per language
+
+IMPORTANT: All bilingual fields use "el" (not "it", "en", "fr", "es", "de", "cs", "ru", or "pt") for the Greek content, and "pl" for Polish.
+DO NOT produce shortened, telegraphic, or bullet-point-style content in any field that requests prose.`,
+      },
+      {
+        role: "user",
+        content: `Create a comprehensive, premium bilingual (Greek–Polish) learning resource on the topic: "${topic}".
+
+Target audience: Polish adults learning Modern Greek (B1–B2 level).
+Tone: Engaging, magazine-quality, culturally immersive, intellectually serious.
+
+MANDATORY requirements — failure to meet ANY of these is unacceptable:
+1. ALL prose fields must be long and substantive.
+2. ALL explanations and prose must be provided in BOTH Greek and Polish — every "Bilingual" field has "el" and "pl" keys (NOT "it", "en", "fr", "es", "de", "cs", "ru", or "pt").
+3. DO NOT include a "vocabulary" field — vocabulary is generated separately.
+4. Grammar: 3 sections minimum, each with ≥ 5-sentence explanations and ≥ 4 example pairs. Focus on Greek-specific structures (noun declension in 4 cases, verb aspects, augment in past tenses, articles, verb conjugation patterns, subjunctive mood with να, conditional with θα, imperative, the verb "to be" είμαι, particle θα for future/conditional).
+5. Common mistakes: SPECIFIC to Polish speakers — name the Polish pattern causing interference. Key traps: confusing Greek cases with Polish cases, omitting the article (Greek requires it almost always), false friends from shared Greek-origin words (e.g., "πρόβλημα" means problem, same as Polish "problem"), spelling confusion between similar-looking Greek letters (ν/η/υ/ι all sound like /i/), verb aspect mistakes, the double negation (δεν... τίποτα). ≥ 5 mistakes total.
+6. Mini-story: ≥ 200 words per language, literary quality, named characters set in Greece (Αθήνα, Θεσσαλονίκη, Κρήτη, Σαντορίνη, Μύκονος, Δελφοί, Ολυμπία, etc.).
+7. Dialogue: ≥ 16 lines, authentic Modern Greek, multi-sentence utterances, grammar notes on ≥ 6 lines.
+8. Culture content: ≥ 250 words per language — historical depth, regional specifics, contemporary relevance (ancient philosophy, Byzantine heritage, Greek Orthodox tradition, rebetiko, taverna culture, Greek mythology, the Olympic Games, Greek cuisine: moussaka, spanakopita, souvlaki, baklava, ouzo, retsina, Greek coffee).
+9. Cultural notes: 3–4 notes, each ≥ 3 sentences per language.
+10. Proverb: must be a REAL Greek proverb (παροιμία). Meaning field ≥ 4 sentences per language.
+11. Idiom: genuine Greek idiom/expression. Origin story required (≥ 3 sentences per language).
+12. Phrases: 8 items, each with detailed context ≥ 2–3 sentences per language.
+13. deep_dive_title: concise encyclopedic section title (3–7 words). deep_dive: ≥ 250 words per language — authoritative, encyclopedic analysis. NO "lesson/journey" framing.
+14. closing_reflection_title: concise encyclopedic section title. closing_reflection: ≥ 200 words per language — scholarly synthesis. NO "lesson/journey" framing.
+
+CRITICAL — You MUST respond with a single valid JSON object. No markdown, no code fences, no extra text — ONLY the raw JSON.
+
+Use "el" key (not "it", "en", "fr", "es", "de", "cs", "ru", or "pt") for Greek content in all Bilingual fields. Do NOT include a "vocabulary" field:
+{
+  "topic": {"el": "...", "pl": "..."},
+  "subtitle": {"el": "...", "pl": "..."},
+  "emoji": "🇬🇷",
+  "tags": ["tag1", "tag2", "tag3"],
+  "difficulty_level": "B1",
+  "estimated_reading_minutes": 12,
+  "introduction": {"el": "...", "pl": "..."},
+  "key_takeaways": [{"el": "...", "pl": "..."}, {"el": "...", "pl": "..."}, {"el": "...", "pl": "..."}],
+  "trivia": {"el": "...", "pl": "..."},
+  "regional_notes": {"el": "...", "pl": "..."},
+  "deep_dive_title": {"el": "...", "pl": "..."},
+  "deep_dive": {"el": "...", "pl": "..."},
+  "grammar": [...],
+  "common_mistakes": [...],
+  "useful_phrases": [...],
+  "mini_story": {"title": {"el": "...", "pl": "..."}, "text": {"el": "...", "pl": "..."}, "moral": {"el": "...", "pl": "..."}},
+  "dialogue": {"title": {"el": "...", "pl": "..."}, "setting": {"el": "...", "pl": "..."}, "lines": [...], "vocabulary_highlight": ["..."]},
+  "closing_reflection_title": {"el": "...", "pl": "..."},
+  "closing_reflection": {"el": "...", "pl": "..."},
+  "culture": {"title": {"el": "...", "pl": "..."}, "content": {"el": "...", "pl": "..."}, "did_you_know": {"el": "...", "pl": "..."}},
+  "cultural_notes": [{"icon": "🏛️", "title": {"el": "...", "pl": "..."}, "content": {"el": "...", "pl": "..."}, "region": "..."}],
+  "proverb": {"text": "...", "translation": {"el": "...", "pl": "..."}, "meaning": {"el": "...", "pl": "..."}},
+  "idiom": {"phrase": "...", "literal": {"el": "...", "pl": "..."}, "meaning": {"el": "...", "pl": "..."}, "origin": {"el": "...", "pl": "..."}, "example_sentence": {"el": "...", "pl": "..."}}
+}
+
+Remember: this resource must be so good that a learner could use it as their primary reference for this topic.`,
+      },
+    ],
+    response_format: { type: "json_object" },
+    // OpenRouter extensions: heal malformed JSON; route only to JSON-capable providers
+    plugins: [{ id: "response-healing" }],
+    provider: { require_parameters: true },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  } as any);
+
+  const greekText = response.choices[0]?.message?.content;
+  if (!greekText) throw new Error("Empty response from API");
+
+  const data = tryParseJSON(greekText);
+
+  // Validate required fields
+  const REQUIRED = ['topic','subtitle','emoji','tags','difficulty_level','introduction','key_takeaways','grammar','common_mistakes','useful_phrases','mini_story','dialogue','closing_reflection','culture','cultural_notes','proverb','idiom'];
+  const missing = findMissingRequiredFields(data, REQUIRED);
+  if (missing.length > 0) {
+    throw new Error(`Incomplete lesson JSON — missing fields: ${missing.join(', ')}`);
+  }
+
+  // Normalize difficulty level to single CEFR code
+  data.difficulty_level = normalizeDifficultyLevel(data.difficulty_level);
+
+  // Generate vocabulary as a separate request with full lesson context
+  const vocabulary = await generateGreekVocabulary(data, apiKey, model || getSavedModel() || DEFAULT_MODEL, client);
+
+  return {
+    ...data,
+    vocabulary,
+    id: typeof crypto !== "undefined" && crypto.randomUUID
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+    timestamp: Date.now(),
+    targetLang: 'el' as const,
+  } as Lesson;
+};
+
+// ─── Greek Vocabulary Generation ─────────────────────────────────────────────
+
+async function generateGreekVocabulary(
+  lessonData: Record<string, unknown>,
+  apiKey: string,
+  model: string,
+  client?: OpenAI
+): Promise<import('../types').VocabularyItem[]> {
+  const c = client ?? new OpenAI({ baseURL: "https://openrouter.ai/api/v1", apiKey, dangerouslyAllowBrowser: true });
+
+  const lessonSummary = JSON.stringify({
+    topic: lessonData.topic,
+    tags: lessonData.tags,
+    difficulty_level: lessonData.difficulty_level,
+    introduction: lessonData.introduction,
+    deep_dive: lessonData.deep_dive,
+    grammar: lessonData.grammar,
+    mini_story: lessonData.mini_story,
+    dialogue: lessonData.dialogue,
+  });
+
+  const elVocabResponse = await c.chat.completions.create({
+    model,
+    messages: [
+      {
+        role: "system",
+        content: `You are a specialist Modern Greek lexicographer and vocabulary teacher for Polish speakers. You create precise, detailed, encyclopedic vocabulary entries for language learners. Your entries are accurate, pedagogically rich, and directly relevant to the topic at hand. Pay special attention to Greek noun genders (masculine/feminine/neuter), noun declension patterns across all four cases (nominative, genitive, accusative, vocative), verb aspect (perfective/imperfective), verbal conjugation in the present, past (aorist and imperfect), and future tense, the tonos accent mark and its placement, and pronunciation features of the Greek alphabet. Provide all Greek words with proper accent marks (tonos).`,
+      },
+      {
+        role: "user",
+        content: `Based on the following Greek lesson content, generate a vocabulary list of EXACTLY 15 to 25 items (no fewer than 15, no more than 25). Choose the most important, topic-relevant Modern Greek words and phrases — a mix of nouns, verbs, adjectives, adverbs, and set phrases.
+
+LESSON CONTENT:
+${lessonSummary}
+
+For each vocabulary item provide:
+- word: the Greek word/phrase (for nouns include the definite article to show gender: ο/η/το)
+- ipa: full IPA phonetic transcription of the Greek word
+- gender: "m" (masculine), "f" (feminine), "n" (neuter / use "invariant" for verbs/adjectives/adverbs)
+- plural: plural form (for nouns)
+- part_of_speech: one of noun|verb|adjective|adverb|phrase|interjection|conjunction|preposition
+- register: one of formal|informal|colloquial|literary|regional|vulgar
+- translation: Polish translation
+- definition: {"el": "2-3 sentence definition in Modern Greek", "pl": "2-3 sentence definition in Polish"}
+- context_sentence: {"el": "A vivid Modern Greek example sentence with accent marks", "pl": "Polish translation"}
+- audio_hint: pronunciation tip for Polish speakers (e.g. Greek letters and sounds: γ before ε/ι sounds like Polish 'j', double γγ/γκ = /g/, θ = /θ/ like English 'th', δ = /ð/ like English 'th' in 'the', χ = /x/ like Polish 'ch', ξ = /ks/, ψ = /ps/, υ/η/ι/ει/οι all = /i/, αυ/ευ = /av/ or /af/ before voiceless, stress placement)
+- etymology: {"el": "etymology in Greek", "pl": "etymology in Polish"}
+- synonyms: array of 3-4 Greek synonyms
+- antonyms: array of 2-3 Greek antonyms
+- word_family: array of 3-4 related forms: [{"form": "...", "type": "...", "translation": "..."}]
+
+CRITICAL: Respond with ONLY a raw JSON object:
+{
+  "vocabulary": [
+    {
+      "word": "...", "ipa": "...", "gender": "m|f|invariant", "plural": "...",
+      "part_of_speech": "noun|verb|...", "register": "formal|informal|...",
+      "translation": "...",
+      "definition": {"el": "...", "pl": "..."},
+      "context_sentence": {"el": "...", "pl": "..."},
+      "audio_hint": "...",
+      "etymology": {"el": "...", "pl": "..."},
+      "synonyms": ["...", "..."], "antonyms": ["...", "..."],
+      "word_family": [{"form": "...", "type": "...", "translation": "..."}]
+    }
+  ]
+}`,
+      },
+    ],
+    response_format: { type: "json_object" },
+    // OpenRouter extensions: heal malformed JSON; route only to JSON-capable providers
+    plugins: [{ id: "response-healing" }],
+    provider: { require_parameters: true },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  } as any);
+
+  const elVocabText = elVocabResponse.choices[0]?.message?.content;
+  if (!elVocabText) return [];
+  try {
+    const parsed = JSON.parse(elVocabText);
+    return parsed.vocabulary ?? [];
+  } catch {
+    return [];
+  }
+}

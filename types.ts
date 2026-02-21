@@ -1,7 +1,7 @@
 // ─── Primitives ───────────────────────────────────────────────────────────────
 
-export type Lang = 'it' | 'pl' | 'en' | 'fr' | 'es' | 'de' | 'cs' | 'ru' | 'pt';
-export type TargetLang = 'it' | 'en' | 'fr' | 'es' | 'de' | 'cs' | 'ru' | 'pt'; // język docelowy nauki
+export type Lang = 'it' | 'pl' | 'en' | 'fr' | 'es' | 'de' | 'cs' | 'ru' | 'pt' | 'el';
+export type TargetLang = 'it' | 'en' | 'fr' | 'es' | 'de' | 'cs' | 'ru' | 'pt' | 'el'; // język docelowy nauki
 
 export interface Bilingual {
   it?: string;
@@ -12,6 +12,7 @@ export interface Bilingual {
   cs?: string;
   ru?: string;
   pt?: string;
+  el?: string;
   pl: string;
 }
 
@@ -59,6 +60,7 @@ export interface GrammarExample {
   cs?: string;
   ru?: string;
   pt?: string;
+  el?: string;
   pl: string;
   breakdown?: string;               // e.g. "soggetto + ausiliare + participio"
 }
