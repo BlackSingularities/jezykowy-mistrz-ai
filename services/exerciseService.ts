@@ -5,6 +5,32 @@ import { getSavedModel } from "./geminiService";
 const DEFAULT_MODEL = "google/gemini-2.5-pro-preview-03-25";
 const MAX_EXERCISES = 20;
 
+/** Build a distribution string for the given count */
+function buildDistributionPrompt(count: number, langNamePl: string, tl: string): string {
+  if (count >= 20) {
+    return `OBOWIĄZKOWY rozkład typów ćwiczeń:
+- 3x multiple_choice (wybór wielokrotny – pytanie w języku ${langNamePl} lub PL)
+- 2x fill_blank (uzupełnij lukę w zdaniu – zdanie w języku ${langNamePl})
+- 2x translation_tl_pl (przetłumacz z ${langNamePl} na polski)
+- 2x translation_pl_tl (przetłumacz z polskiego na ${langNamePl})
+- 1x matching (dopasuj 5 par: słowo ${langNamePl} ↔ polskie znaczenie)
+- 1x word_order (ułóż słowa w zdanie – słowa w ${langNamePl})
+- 2x true_false (prawda/fałsz – zdanie w ${langNamePl})
+- 1x error_correction (popraw błąd w zdaniu ${langNamePl})
+- 1x conjugation (podaj formę czasownika w ${langNamePl})
+- 1x gap_fill_wordbank (uzupełnij tekst z bankiem słów – tekst w ${langNamePl})
+- 1x dialogue_completion (uzupełnij brakującą kwestię dialogu w ${langNamePl})
+- 2x definition_match (dopasuj słowo do definicji – definicja w ${langNamePl})
+= 20 ćwiczeń łącznie`;
+  } else if (count >= 10) {
+    return `Rozkład typów ćwiczeń (łącznie ${count}):
+Użyj różnych typów. Wymagane: przynajmniej 1x multiple_choice, 1x fill_blank, 1x translation_tl_pl, 1x translation_pl_tl, 1x true_false, 1x matching lub word_order. Pozostałe dobierz według własnego uznania spośród: error_correction, conjugation, gap_fill_wordbank, dialogue_completion, definition_match.`;
+  } else {
+    return `Rozkład typów ćwiczeń (łącznie ${count}):
+Użyj jak najbardziej zróżnicowanych typów. Wymagane: przynajmniej 1x multiple_choice, 1x translation_tl_pl lub translation_pl_tl, 1x fill_blank. Pozostałe dobierz swobodnie.`;
+  }
+}
+
 // ─── Lesson summary builder ───────────────────────────────────────────────────
 
 function buildLessonSummary(lesson: Lesson): string {
@@ -164,7 +190,9 @@ function isValidExercise(ex: unknown): ex is Exercise {
 export async function generateExercises(
   lesson: Lesson,
   apiKey: string,
-  model?: string
+  model?: string,
+  count: number = MAX_EXERCISES,
+  existingExerciseIds: string[] = []
 ): Promise<ExerciseSet> {
   const client = new OpenAI({
     baseURL: "https://openrouter.ai/api/v1",
@@ -190,7 +218,13 @@ export async function generateExercises(
   };
   const langNamePl = langLabel[tl] ?? tl;
 
-  const prompt = `Jesteś ekspertem dydaktyki językowej. Na podstawie poniższej lekcji stwórz dokładnie ${MAX_EXERCISES} zróżnicowanych ćwiczeń językowych.
+  const actualCount = Math.min(Math.max(count, 1), 50);
+  const existingNote = existingExerciseIds.length > 0
+    ? `\nUWAGA: Poniższe ćwiczenia już istnieją w zestawie — wygeneruj NOWE, INNE ćwiczenia, które NIE powielają poniższych. Istniejące ID: ${existingExerciseIds.join(', ')}.`
+    : '';
+  const startId = existingExerciseIds.length + 1;
+
+  const prompt = `Jesteś ekspertem dydaktyki językowej. Na podstawie poniższej lekcji stwórz dokładnie ${actualCount} zróżnicowanych ćwiczeń językowych.${existingNote}
 
 === MATERIAŁ LEKCJI ===
 ${lessonSummary}
@@ -198,22 +232,9 @@ ${lessonSummary}
 === WYMAGANIA ===
 
 Język docelowy lekcji: ${langNamePl} (${tl})
-Stwórz dokładnie ${MAX_EXERCISES} ćwiczeń (liczymy od 1 do ${MAX_EXERCISES}).
+Stwórz dokładnie ${actualCount} ćwiczeń (numeruj ID od ex_${startId} do ex_${startId + actualCount - 1}).
 
-OBOWIĄZKOWY rozkład typów ćwiczeń:
-- 3x multiple_choice (wybór wielokrotny – pytanie w języku ${langNamePl} lub PL)
-- 2x fill_blank (uzupełnij lukę w zdaniu – zdanie w języku ${langNamePl})
-- 2x translation_tl_pl (przetłumacz z ${langNamePl} na polski)
-- 2x translation_pl_tl (przetłumacz z polskiego na ${langNamePl})
-- 1x matching (dopasuj 5 par: słowo ${langNamePl} ↔ polskie znaczenie)
-- 1x word_order (ułóż słowa w zdanie – słowa w ${langNamePl})
-- 2x true_false (prawda/fałsz – zdanie w ${langNamePl})
-- 1x error_correction (popraw błąd w zdaniu ${langNamePl})
-- 1x conjugation (podaj formę czasownika w ${langNamePl})
-- 1x gap_fill_wordbank (uzupełnij tekst z bankiem słów – tekst w ${langNamePl})
-- 1x dialogue_completion (uzupełnij brakującą kwestię dialogu w ${langNamePl})
-- 2x definition_match (dopasuj słowo do definicji – definicja w ${langNamePl})
-= 20 ćwiczeń łącznie
+${buildDistributionPrompt(actualCount, langNamePl, tl)}
 
 Ćwiczenia muszą być:
 - Bardzo zróżnicowane pod względem formatu i treści
@@ -228,7 +249,7 @@ Każde ćwiczenie ma pola bazowe + pola specyficzne dla typu.
 
 POLA BAZOWE (wymagane dla każdego ćwiczenia):
 {
-  "id": "ex_1",             // ex_1 do ex_20
+  "id": "ex_${startId}",    // ex_${startId} do ex_${startId + actualCount - 1}
   "type": "...",            // jeden z typów powyżej
   "difficulty": "easy|medium|hard",
   "focus": "...",           // co to ćwiczenie sprawdza, np. "słownictwo – jedzenie", "gramatyka – passato prossimo"
@@ -339,8 +360,8 @@ definition_match:
 }
 
 === WAŻNE ===
-- Zwróć obiekt: {"exercises": [...array of 20 exercises...]}
-- Każde id unikalne: ex_1, ex_2, ..., ex_20
+- Zwróć obiekt: {"exercises": [...array of ${actualCount} exercises...]}
+- Każde id unikalne: ex_${startId}, ex_${startId + 1}, ..., ex_${startId + actualCount - 1}
 - Wszystkie polskie instrukcje płynne i poprawne językowo
 - Sprawdź poprawność merytoryczną każdego ćwiczenia
 - Ćwiczenia muszą bazować na materiale z lekcji, nie być wymyślone z powietrza`;
@@ -378,7 +399,7 @@ definition_match:
   // Filter to valid exercises only
   const exercises = exercisesRaw
     .filter(isValidExercise)
-    .slice(0, MAX_EXERCISES) as Exercise[];
+    .slice(0, actualCount) as Exercise[];
 
   if (exercises.length === 0) {
     throw new Error("AI returned no valid exercises. Please try again.");
@@ -401,6 +422,29 @@ definition_match:
   };
 
   return exerciseSet;
+}
+
+// ─── Append more exercises to existing set ────────────────────────────────────
+
+/**
+ * Generates additional exercises and merges them into the existing ExerciseSet.
+ * Returns a new ExerciseSet with both old and new exercises.
+ */
+export async function appendExercises(
+  lesson: Lesson,
+  existingSet: ExerciseSet,
+  count: number,
+  apiKey: string,
+  model?: string
+): Promise<ExerciseSet> {
+  const existingIds = existingSet.exercises.map(e => e.id);
+  const newSet = await generateExercises(lesson, apiKey, model, count, existingIds);
+
+  return {
+    ...existingSet,
+    generatedAt: Date.now(),
+    exercises: [...existingSet.exercises, ...newSet.exercises],
+  };
 }
 
 // ─── Storage helpers ──────────────────────────────────────────────────────────

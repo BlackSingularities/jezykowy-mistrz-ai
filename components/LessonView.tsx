@@ -33,7 +33,7 @@ import { useLang, useTheme, useFontSize } from '../context/LangContext';
 import { B } from './BilingualBlock';
 import { Flag, LangFlag } from './Flag';
 import { ExerciseRunner } from './ExerciseRunner';
-import { generateExercises, saveExerciseSet, loadExerciseSet } from '../services/exerciseService';
+import { generateExercises, appendExercises, saveExerciseSet, loadExerciseSet } from '../services/exerciseService';
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
@@ -828,8 +828,10 @@ export const LessonView: React.FC<LessonViewProps> = ({ lesson, onBack, onChange
   const [showExerciseRunner, setShowExerciseRunner] = useState(false);
   const [exerciseSet, setExerciseSet] = useState<ExerciseSet | null>(null);
   const [generatingExercises, setGeneratingExercises] = useState(false);
+  const [generatingMoreExercises, setGeneratingMoreExercises] = useState(false);
   const [exerciseGenError, setExerciseGenError] = useState('');
   const [exerciseLoadStatus, setExerciseLoadStatus] = useState<'loading' | 'loaded' | 'none'>('loading');
+  const [exerciseCount, setExerciseCount] = useState<number>(10);
 
   // Load existing exercises for this lesson on mount
   useEffect(() => {
@@ -846,7 +848,7 @@ export const LessonView: React.FC<LessonViewProps> = ({ lesson, onBack, onChange
     try {
       const apiKey = localStorage.getItem('openrouter_api_key') || '';
       if (!apiKey) { setExerciseGenError('Brak klucza API'); return; }
-      const set = await generateExercises(lesson, apiKey);
+      const set = await generateExercises(lesson, apiKey, undefined, exerciseCount);
       await saveExerciseSet(set);
       setExerciseSet(set);
       setExerciseLoadStatus('loaded');
@@ -856,6 +858,24 @@ export const LessonView: React.FC<LessonViewProps> = ({ lesson, onBack, onChange
       setExerciseGenError(msg || 'Błąd generowania ćwiczeń');
     } finally {
       setGeneratingExercises(false);
+    }
+  };
+
+  const handleGenerateMoreExercises = async (moreCount: number) => {
+    if (!exerciseSet || generatingMoreExercises) return;
+    setGeneratingMoreExercises(true);
+    setExerciseGenError('');
+    try {
+      const apiKey = localStorage.getItem('openrouter_api_key') || '';
+      if (!apiKey) { setExerciseGenError('Brak klucza API'); return; }
+      const updatedSet = await appendExercises(lesson, exerciseSet, moreCount, apiKey);
+      await saveExerciseSet(updatedSet);
+      setExerciseSet(updatedSet);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setExerciseGenError(msg || 'Błąd generowania ćwiczeń');
+    } finally {
+      setGeneratingMoreExercises(false);
     }
   };
 
@@ -1871,9 +1891,9 @@ export const LessonView: React.FC<LessonViewProps> = ({ lesson, onBack, onChange
                     <div className="space-y-4">
                       <p className="text-sm" style={{ color: 'var(--c-muted)' }}>
                         {t3(
-                          `Wygenerowano ${exerciseSet.exercises.length} zróżnicowanych ćwiczeń na podstawie tej lekcji. Ćwiczenia obejmują różne typy zadań: wybór wielokrotny, tłumaczenia, uzupełnianie luk, dopasowywanie i wiele więcej.`,
+                          `Wygenerowano ${exerciseSet.exercises.length} zróżnicowanych ćwiczeń na podstawie tej lekcji.`,
                           `Sono stati generati ${exerciseSet.exercises.length} esercizi variegati basati su questa lezione.`,
-                          `${exerciseSet.exercises.length} diverse exercises generated from this lesson. Exercises cover multiple types: multiple choice, translations, fill-in-the-blank, matching, and more.`,
+                          `${exerciseSet.exercises.length} diverse exercises generated from this lesson.`,
                           `${exerciseSet.exercises.length} exercices variés générés à partir de cette leçon.`,
                           `${exerciseSet.exercises.length} ejercicios variados generados a partir de esta lección.`,
                           `${exerciseSet.exercises.length} abwechslungsreiche Übungen zu dieser Lektion generiert.`
@@ -1882,7 +1902,7 @@ export const LessonView: React.FC<LessonViewProps> = ({ lesson, onBack, onChange
                       {/* Exercise type summary */}
                       <div className="flex flex-wrap gap-2">
                         {Array.from(new Set(exerciseSet.exercises.map(e => e.type))).map(type => {
-                          const count = exerciseSet.exercises.filter(e => e.type === type).length;
+                          const cnt = exerciseSet.exercises.filter(e => e.type === type).length;
                           const icons: Record<string, string> = {
                             multiple_choice: '🔘', fill_blank: '✏️', translation_tl_pl: '🔄',
                             translation_pl_tl: '↩️', matching: '🔗', word_order: '🔀',
@@ -1892,12 +1912,12 @@ export const LessonView: React.FC<LessonViewProps> = ({ lesson, onBack, onChange
                           return (
                             <span key={type} className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs"
                               style={{ background: 'rgba(99,102,241,.08)', color: '#6366f1', border: '1px solid rgba(99,102,241,.15)' }}>
-                              {icons[type] ?? '📌'} {count}×
+                              {icons[type] ?? '📌'} {cnt}×
                             </span>
                           );
                         })}
                       </div>
-                      <div className="flex flex-wrap gap-3">
+                      <div className="flex flex-wrap gap-3 items-center">
                         <button
                           onClick={() => setShowExerciseRunner(true)}
                           className="flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-bold text-white transition-all"
@@ -1906,20 +1926,52 @@ export const LessonView: React.FC<LessonViewProps> = ({ lesson, onBack, onChange
                           <AcademicCapIcon className="w-4 h-4" />
                           {t3('Zacznij ćwiczenia', 'Inizia gli esercizi', 'Start exercises', 'Commencer les exercices', 'Empezar ejercicios', 'Übungen starten')}
                         </button>
+                        {/* Generate more exercises */}
+                        <div className="flex items-center gap-1.5 rounded-xl border overflow-hidden"
+                          style={{ border: '1px solid rgba(99,102,241,.3)' }}>
+                          {[5, 10, 15, 20].map(n => (
+                            <button
+                              key={n}
+                              onClick={() => setExerciseCount(n)}
+                              className="px-3 py-2 text-xs font-bold transition-all"
+                              style={{
+                                background: exerciseCount === n ? '#6366f1' : 'transparent',
+                                color: exerciseCount === n ? '#fff' : '#6366f1',
+                              }}
+                            >
+                              +{n}
+                            </button>
+                          ))}
+                        </div>
                         <button
-                          onClick={handleGenerateExercises}
-                          disabled={generatingExercises}
+                          onClick={() => handleGenerateMoreExercises(exerciseCount)}
+                          disabled={generatingMoreExercises}
                           className="flex items-center gap-2 px-4 py-3 rounded-xl text-sm font-medium border transition-all disabled:opacity-50"
                           style={{ border: '1px solid rgba(99,102,241,.3)', color: '#6366f1', background: 'rgba(99,102,241,.05)' }}
                         >
-                          {generatingExercises
+                          {generatingMoreExercises
                             ? <SparklesIcon className="w-4 h-4 animate-spin" />
                             : <SparklesIcon className="w-4 h-4" />}
+                          {generatingMoreExercises
+                            ? t3('Generuję…', 'Generando…', 'Generating…', 'Génération…', 'Generando…', 'Generiere…')
+                            : t3(`Dodaj ${exerciseCount} ćwiczeń`, `Aggiungi ${exerciseCount} esercizi`, `Add ${exerciseCount} exercises`, `Ajouter ${exerciseCount} exercices`, `Añadir ${exerciseCount} ejercicios`, `${exerciseCount} Übungen hinzufügen`)}
+                        </button>
+                        <button
+                          onClick={handleGenerateExercises}
+                          disabled={generatingExercises}
+                          className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium transition-all disabled:opacity-50"
+                          style={{ color: 'var(--c-faint)', border: '1px solid var(--c-border)' }}
+                          title={t3('Zastąp istniejące ćwiczenia nowymi', 'Sostituisci esercizi', 'Replace exercises with new set', 'Remplacer les exercices', 'Reemplazar ejercicios', 'Übungen ersetzen')}
+                        >
                           {generatingExercises
-                            ? t3('Generuję nowe…', 'Generando nuovi…', 'Generating new…', 'Génération…', 'Generando…', 'Generiere…')
-                            : t3('Regeneruj (nowe 20)', 'Rigenera (nuovi 20)', 'Regenerate (new 20)', 'Régénérer (20 nouveaux)', 'Regenerar (nuevos 20)', 'Neu generieren (20)')}
+                            ? <SparklesIcon className="w-3.5 h-3.5 animate-spin" />
+                            : <SparklesIcon className="w-3.5 h-3.5" />}
+                          {t3('Zastąp', 'Rigenera', 'Replace', 'Remplacer', 'Reemplazar', 'Ersetzen')}
                         </button>
                       </div>
+                      {exerciseGenError && (
+                        <p className="text-sm" style={{ color: 'var(--c-red)' }}>{exerciseGenError}</p>
+                      )}
                     </div>
                   ) : (
                     <div className="flex flex-col items-center gap-4 text-center py-4">
@@ -1931,14 +1983,36 @@ export const LessonView: React.FC<LessonViewProps> = ({ lesson, onBack, onChange
                         </p>
                         <p className="text-sm leading-relaxed" style={{ color: 'var(--c-muted)' }}>
                           {t3(
-                            'Wygeneruj do 20 zróżnicowanych ćwiczeń opartych na tej lekcji. Ćwiczenia zostaną zapisane i będą dostępne w zakładce Ćwiczenia.',
-                            'Genera fino a 20 esercizi variegati basati su questa lezione.',
-                            'Generate up to 20 diverse exercises based on this lesson. Exercises are saved and accessible from the Exercises view.',
-                            'Générez jusqu\'à 20 exercices variés basés sur cette leçon.',
-                            'Genera hasta 20 ejercicios variados basados en esta lección.',
-                            'Generiere bis zu 20 abwechslungsreiche Übungen zu dieser Lektion.'
+                            'Wygeneruj zróżnicowane ćwiczenia oparte na tej lekcji. Ćwiczenia zostaną zapisane i będą dostępne w zakładce Ćwiczenia.',
+                            'Genera esercizi variegati basati su questa lezione.',
+                            'Generate diverse exercises based on this lesson. Exercises are saved and accessible from the Exercises view.',
+                            'Générez des exercices variés basés sur cette leçon.',
+                            'Genera ejercicios variados basados en esta lección.',
+                            'Generiere abwechslungsreiche Übungen zu dieser Lektion.'
                           )}
                         </p>
+                      </div>
+                      {/* Count selector */}
+                      <div className="flex flex-col items-center gap-2">
+                        <p className="text-xs font-semibold" style={{ color: 'var(--c-muted)' }}>
+                          {t3('Liczba ćwiczeń:', 'Numero di esercizi:', 'Number of exercises:', 'Nombre d\'exercices :', 'Número de ejercicios:', 'Anzahl Übungen:')}
+                        </p>
+                        <div className="flex items-center gap-1 rounded-xl border overflow-hidden"
+                          style={{ border: '1px solid rgba(99,102,241,.3)' }}>
+                          {[5, 10, 15, 20].map(n => (
+                            <button
+                              key={n}
+                              onClick={() => setExerciseCount(n)}
+                              className="px-4 py-2 text-sm font-bold transition-all"
+                              style={{
+                                background: exerciseCount === n ? '#6366f1' : 'transparent',
+                                color: exerciseCount === n ? '#fff' : '#6366f1',
+                              }}
+                            >
+                              {n}
+                            </button>
+                          ))}
+                        </div>
                       </div>
                       <button
                         onClick={handleGenerateExercises}
@@ -1951,7 +2025,7 @@ export const LessonView: React.FC<LessonViewProps> = ({ lesson, onBack, onChange
                           : <SparklesIcon className="w-4 h-4" />}
                         {generatingExercises
                           ? t3('Generuję ćwiczenia AI…', 'Sto generando…', 'Generating exercises…', 'Génération en cours…', 'Generando ejercicios…', 'Generiere Übungen…')
-                          : t3('Generuj 20 ćwiczeń AI', 'Genera 20 esercizi', 'Generate 20 exercises', 'Générer 20 exercices', 'Generar 20 ejercicios', '20 Übungen generieren')}
+                          : t3(`Generuj ${exerciseCount} ćwiczeń AI`, `Genera ${exerciseCount} esercizi`, `Generate ${exerciseCount} exercises`, `Générer ${exerciseCount} exercices`, `Generar ${exerciseCount} ejercicios`, `${exerciseCount} Übungen generieren`)}
                       </button>
                       {exerciseGenError && (
                         <p className="text-sm" style={{ color: 'var(--c-red)' }}>{exerciseGenError}</p>
