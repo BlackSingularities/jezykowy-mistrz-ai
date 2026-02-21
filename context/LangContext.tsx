@@ -3,7 +3,7 @@ import type { TargetLang } from '../types';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-export type Lang = 'it' | 'pl' | 'en' | 'fr' | 'es' | 'de' | 'cs' | 'ru' | 'pt';
+export type Lang = 'it' | 'pl' | 'en' | 'fr' | 'es' | 'de' | 'cs' | 'ru' | 'pt' | 'el';
 export type Theme = 'light' | 'dark';
 
 export interface LangContextValue {

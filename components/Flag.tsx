@@ -5,7 +5,7 @@ import React from 'react';
 // Polish flag:  white / red (2 horizontal stripes)
 
 interface FlagProps {
-  code: 'it' | 'pl' | 'en' | 'fr' | 'es' | 'de' | 'cs' | 'ru' | 'pt';
+  code: 'it' | 'pl' | 'en' | 'fr' | 'es' | 'de' | 'cs' | 'ru' | 'pt' | 'el';
   /** Height in px; width is auto (1.5× for IT, same for PL) */
   size?: number;
   className?: string;
@@ -21,7 +21,7 @@ export const Flag: React.FC<FlagProps> = ({
   'aria-hidden': ariaHidden,
 }) => {
   const hidden = ariaHidden === true || ariaHidden === 'true';
-  const label = hidden ? undefined : (ariaLabel ?? (code === 'it' ? 'Flaga Włoch' : code === 'en' ? 'Flaga Wielkiej Brytanii' : code === 'fr' ? 'Flaga Francji' : code === 'es' ? 'Flaga Hiszpanii' : code === 'de' ? 'Flaga Niemiec' : code === 'cs' ? 'Flaga Czech' : code === 'ru' ? 'Flaga Rosji' : code === 'pt' ? 'Flaga Portugalii' : 'Flaga Polski'));
+  const label = hidden ? undefined : (ariaLabel ?? (code === 'it' ? 'Flaga Włoch' : code === 'en' ? 'Flaga Wielkiej Brytanii' : code === 'fr' ? 'Flaga Francji' : code === 'es' ? 'Flaga Hiszpanii' : code === 'de' ? 'Flaga Niemiec' : code === 'cs' ? 'Flaga Czech' : code === 'ru' ? 'Flaga Rosji' : code === 'pt' ? 'Flaga Portugalii' : code === 'el' ? 'Flaga Grecji' : 'Flaga Polski'));
   const w = Math.round(size * 1.5);
   const h = size;
 
@@ -93,6 +93,21 @@ export const Flag: React.FC<FlagProps> = ({
           <rect x="1" width="2" height="2" fill="#ff0000"/>
           <circle cx="1" cy="1" r="0.35" fill="#ffcc00" stroke="#006600" strokeWidth="0.05"/>
         </svg>
+      ) : code === 'el' ? (
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 27 18" width={w} height={h} style={{ display: 'block' }}>
+          {/* Blue background */}
+          <rect width="27" height="18" fill="#0D5EAF"/>
+          {/* White stripes */}
+          <rect y="2" width="27" height="2" fill="#ffffff"/>
+          <rect y="6" width="27" height="2" fill="#ffffff"/>
+          <rect y="10" width="27" height="2" fill="#ffffff"/>
+          <rect y="14" width="27" height="2" fill="#ffffff"/>
+          {/* Blue canton */}
+          <rect width="10" height="10" fill="#0D5EAF"/>
+          {/* White cross in canton */}
+          <rect y="4" width="10" height="2" fill="#ffffff"/>
+          <rect x="4" width="2" height="10" fill="#ffffff"/>
+        </svg>
       ) : (
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 8 5" width={w} height={h} style={{ display: 'block' }}>
           <rect width="8" height="5" fill="#ffffff"/>
@@ -106,7 +121,7 @@ export const Flag: React.FC<FlagProps> = ({
 // ─── Convenience: flag that auto-follows current language ─────────────────────
 
 export const LangFlag: React.FC<{
-  lang: 'it' | 'pl' | 'en' | 'fr' | 'es' | 'de' | 'cs' | 'ru' | 'pt';
+  lang: 'it' | 'pl' | 'en' | 'fr' | 'es' | 'de' | 'cs' | 'ru' | 'pt' | 'el';
   size?: number;
   className?: string;
 }> = ({ lang, size = 16, className }) => (

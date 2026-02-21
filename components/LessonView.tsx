@@ -144,12 +144,12 @@ function splitText(text: string): string[] {
   return chunks.length ? chunks : [raw];
 }
 
-const useTTS = (targetLang: 'it' | 'en' | 'fr' | 'es' | 'de' | 'cs' | 'ru' | 'pt' = 'it') => {
+const useTTS = (targetLang: 'it' | 'en' | 'fr' | 'es' | 'de' | 'cs' | 'ru' | 'pt' | 'el' = 'it') => {
   const [rate, setRate] = useState(0.9);
   const [speakId, setSpeakId] = useState<string | null>(null);
   const voiceRef = React.useRef<SpeechSynthesisVoice | null>(null);
   const [hasItalianVoice, setHasItalianVoice] = useState(false);
-  const ttsLang = targetLang === 'en' ? 'en-GB' : targetLang === 'fr' ? 'fr-FR' : targetLang === 'es' ? 'es-ES' : targetLang === 'de' ? 'de-DE' : targetLang === 'cs' ? 'cs-CZ' : targetLang === 'ru' ? 'ru-RU' : targetLang === 'pt' ? 'pt-PT' : 'it-IT';
+  const ttsLang = targetLang === 'en' ? 'en-GB' : targetLang === 'fr' ? 'fr-FR' : targetLang === 'es' ? 'es-ES' : targetLang === 'de' ? 'de-DE' : targetLang === 'cs' ? 'cs-CZ' : targetLang === 'ru' ? 'ru-RU' : targetLang === 'pt' ? 'pt-PT' : targetLang === 'el' ? 'el-GR' : 'it-IT';
 
   useEffect(() => {
     const findVoice = () => {
@@ -195,6 +195,12 @@ const useTTS = (targetLang: 'it' | 'en' | 'fr' | 'es' | 'de' | 'cs' | 'ru' | 'pt
           voices.find(v => v.lang === 'pt-PT' && v.localService) ||
           voices.find(v => v.lang === 'pt-PT') ||
           voices.find(v => v.lang.startsWith('pt')) ||
+          null;
+      } else if (targetLang === 'el') {
+        voiceRef.current =
+          voices.find(v => v.lang === 'el-GR' && v.localService) ||
+          voices.find(v => v.lang === 'el-GR') ||
+          voices.find(v => v.lang.startsWith('el')) ||
           null;
       } else {
         voiceRef.current =
@@ -567,7 +573,7 @@ const SpeakBtn: React.FC<{
   const stopLbl  = globalLang === 'pl' ? 'Zatrzymaj' : globalLang === 'en' ? 'Stop' : globalLang === 'fr' ? 'Arrêter' : globalLang === 'es' ? 'Detener' : globalLang === 'de' ? 'Stopp' : globalLang === 'cs' ? 'Zastavit' : 'Ferma';
   const listenLbl = globalLang === 'pl' ? 'Odsłuchaj' : globalLang === 'en' ? 'Listen' : globalLang === 'fr' ? 'Écouter' : globalLang === 'es' ? 'Escuchar' : globalLang === 'de' ? 'Anhören' : globalLang === 'cs' ? 'Poslechnout' : 'Ascolta';
   const listenTitle = globalLang === 'pl'
-    ? (targetLang === 'en' ? 'Odsłuchaj po angielsku' : targetLang === 'fr' ? 'Odsłuchaj po francusku' : targetLang === 'es' ? 'Odsłuchaj po hiszpańsku' : targetLang === 'de' ? 'Odsłuchaj po niemiecku' : targetLang === 'cs' ? 'Odsłuchaj po czesku' : 'Odsłuchaj po włosku')
+    ? (targetLang === 'en' ? 'Odsłuchaj po angielsku' : targetLang === 'fr' ? 'Odsłuchaj po francusku' : targetLang === 'es' ? 'Odsłuchaj po hiszpańsku' : targetLang === 'de' ? 'Odsłuchaj po niemiecku' : targetLang === 'cs' ? 'Odsłuchaj po czesku' : targetLang === 'ru' ? 'Odsłuchaj po rosyjsku' : targetLang === 'pt' ? 'Odsłuchaj po portugalsku' : targetLang === 'el' ? 'Odsłuchaj po grecku' : 'Odsłuchaj po włosku')
     : globalLang === 'en' ? 'Listen in English' : globalLang === 'fr' ? 'Écouter en français' : globalLang === 'es' ? 'Escuchar en español' : globalLang === 'de' ? 'Auf Deutsch anhören' : globalLang === 'cs' ? 'Poslechnout česky' : 'Ascolta in italiano';
   return (
     <button
@@ -797,9 +803,12 @@ export const LessonView: React.FC<LessonViewProps> = ({ lesson, onBack, onChange
   const isEs = targetLang === 'es';
   const isDe = targetLang === 'de';
   const isCs = targetLang === 'cs';
+  const isRu = targetLang === 'ru';
+  const isPt = targetLang === 'pt';
+  const isEl = targetLang === 'el';
   // Helper: pick target-language text from a bilingual field
-  const tl = (b?: { it?: string; en?: string; fr?: string; es?: string; de?: string; cs?: string; pl?: string }): string =>
-    b ? ((isEn ? b.en : isFr ? b.fr : isEs ? b.es : isDe ? b.de : isCs ? b.cs : b.it) ?? b.pl ?? '') : '';
+  const tl = (b?: { it?: string; en?: string; fr?: string; es?: string; de?: string; cs?: string; ru?: string; pt?: string; el?: string; pl?: string }): string =>
+    b ? ((isEn ? b.en : isFr ? b.fr : isEs ? b.es : isDe ? b.de : isCs ? b.cs : isRu ? b.ru : isPt ? b.pt : isEl ? b.el : b.it) ?? b.pl ?? '') : '';
   const { theme, toggleTheme } = useTheme();
   const { fontSizeIndex, increaseFontSize, decreaseFontSize } = useFontSize();
   const { rate, setRate, speak, stop, speakId, hasItalianVoice } = useTTS(targetLang);
