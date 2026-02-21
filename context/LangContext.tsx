@@ -1,9 +1,7 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
-import type { TargetLang } from '../types';
+import type { TargetLang, Lang } from '../types';
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-export type Lang = 'it' | 'pl' | 'en' | 'fr' | 'es' | 'de' | 'cs' | 'ru' | 'pt' | 'el';
+export type { Lang };
 export type Theme = 'light' | 'dark';
 
 export interface LangContextValue {

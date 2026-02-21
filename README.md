@@ -21,7 +21,7 @@ Aplikacja webowa do nauki języka włoskiego dla Polaków, generująca artykuły
 | Frontend | React 19 + TypeScript |
 | Build | Vite 6 |
 | Style | Tailwind CSS |
-| AI | OpenRouter API → `google/gemini-2.5-flash` |
+| AI | OpenRouter API → `google/gemini-3-pro-preview` |
 | HTTP client | openai SDK (OpenAI-compatible) |
 
 ## Szybki start (Windows)
