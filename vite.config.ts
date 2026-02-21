@@ -28,6 +28,7 @@ interface ServerJob {
   targetLang: 'it' | 'en' | 'fr' | 'es' | 'de' | 'cs' | 'ru' | 'pt' | 'el';
   model: string;
   apiKey: string; // stored server-side only, never returned to client
+  imageData?: string; // base64 data URL for image-based lessons, stored server-side only
   status: 'pending' | 'running' | 'done' | 'error';
   lessonId?: string;
   error?: string;
@@ -71,9 +72,9 @@ function listJobs(): ServerJob[] {
   } catch { return []; }
 }
 
-/** Strip sensitive apiKey before sending to client */
-function safeJob(job: ServerJob): Omit<ServerJob, 'apiKey'> {
-  const { apiKey: _key, ...safe } = job;
+/** Strip sensitive apiKey and imageData before sending to client */
+function safeJob(job: ServerJob): Omit<ServerJob, 'apiKey' | 'imageData'> {
+  const { apiKey: _key, imageData: _img, ...safe } = job;
   return safe;
 }
 
@@ -103,7 +104,26 @@ async function processJob(job: ServerJob, server: any): Promise<void> {
       ? mod.generateGreekLesson
       : mod.generateLesson;
 
-    const lesson = await genFn(job.topic, job.apiKey, job.model);
+    // If imageData is present, analyze the image first to derive the topic
+    let topicForGeneration = job.topic;
+    if (job.imageData) {
+      try {
+        console.log(`[generator] Analyzing image for job "${job.id}"…`);
+        topicForGeneration = await mod.analyzeImageForLesson(
+          job.imageData,
+          job.targetLang,
+          job.topic, // user-provided context hint
+          job.apiKey,
+          job.model
+        );
+        console.log(`[generator] Image topic: "${topicForGeneration}"`);
+      } catch (imgErr: any) {
+        console.warn(`[generator] Image analysis failed, using original topic: ${imgErr?.message}`);
+        topicForGeneration = job.topic || 'Untitled lesson';
+      }
+    }
+
+    const lesson = await genFn(topicForGeneration, job.apiKey, job.model);
 
     // Persist lesson
     ensureHistoryDir();
@@ -227,18 +247,25 @@ function historyApiPlugin() {
           req.on('data', (c: any) => { body += c; });
           req.on('end', () => {
             try {
-              const { topic, targetLang, model, apiKey } = JSON.parse(body);
-              if (!topic || !targetLang || !apiKey) {
+              const { topic, targetLang, model, apiKey, imageData } = JSON.parse(body);
+              if (!targetLang || !apiKey) {
                 res.statusCode = 400;
-                res.end(JSON.stringify({ error: 'Missing required fields: topic, targetLang, apiKey' }));
+                res.end(JSON.stringify({ error: 'Missing required fields: targetLang, apiKey' }));
+                return;
+              }
+              // topic OR imageData must be provided
+              if (!topic && !imageData) {
+                res.statusCode = 400;
+                res.end(JSON.stringify({ error: 'Missing required field: topic or imageData' }));
                 return;
               }
               const job: ServerJob = {
                 id: genJobId(),
-                topic: String(topic),
+                topic: String(topic || ''),
                 targetLang: targetLang as 'it' | 'en' | 'fr' | 'es' | 'de' | 'cs' | 'ru' | 'pt' | 'el',
                 model: String(model || 'google/gemini-3-pro-preview'),
                 apiKey: String(apiKey),
+                ...(imageData ? { imageData: String(imageData) } : {}),
                 status: 'pending',
                 createdAt: Date.now(),
                 updatedAt: Date.now(),

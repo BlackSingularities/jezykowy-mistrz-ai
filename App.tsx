@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useRef, FormEvent } from 'react';
+import React, { useState, useEffect, useRef, FormEvent, useCallback } from 'react';
 import { createRoot } from 'react-dom/client';
 import { loadModels, getSavedModel, saveModel, ORModel, generateSpanishLesson, generateCzechLesson, generateRussianLesson, generatePortugueseLesson, generateGreekLesson } from './services/geminiService';
 import { LessonView, getFavorites, toggleFavorite } from './components/LessonView';
 import { ExercisesView } from './components/ExercisesView';
+import { TextCorrectionView } from './components/TextCorrectionView';
 import { LangProvider, useLang, useTheme, useFontSize } from './context/LangContext';
 import { Flag, LangFlag } from './components/Flag';
 import { Lesson, TargetLang } from './types';
@@ -22,7 +23,7 @@ import {
   ExclamationCircleIcon,
   AcademicCapIcon,
 } from '@heroicons/react/24/solid';
-import { LanguageIcon, SunIcon, MoonIcon, ArrowPathIcon, StarIcon as StarOutlineIcon, ArrowLeftIcon } from '@heroicons/react/24/outline';
+import { LanguageIcon, SunIcon, MoonIcon, ArrowPathIcon, StarIcon as StarOutlineIcon, ArrowLeftIcon, PhotoIcon, XCircleIcon, PencilSquareIcon } from '@heroicons/react/24/outline';
 
 // ─── Queue types ──────────────────────────────────────────────────────────────
 
@@ -525,6 +526,9 @@ const AppInner: React.FC<{
   const isEl = targetLang === 'el';
 
   const [input, setInput] = useState('');
+  const [topicImage, setTopicImage] = useState<string | null>(null); // base64 data URL
+  const [topicImageName, setTopicImageName] = useState('');
+  const [showTextCorrection, setShowTextCorrection] = useState(false);
   const [history, setHistory] = useState<Lesson[]>([]);
   const [historyLoaded, setHistoryLoaded] = useState(false);
   const [activeLesson, setActiveLesson] = useState<Lesson | null>(null);
@@ -537,7 +541,36 @@ const AppInner: React.FC<{
   const [favSet, setFavSet] = useState<Set<string>>(() => getFavorites());
   const [currentPage, setCurrentPage] = useState(1);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
   const ITEMS_PER_PAGE = 20;
+
+  // ── Image upload handler ─────────────────────────────────────────────────────
+  const handleImageSelect = useCallback((file: File) => {
+    if (!file.type.startsWith('image/')) return;
+    setTopicImageName(file.name);
+    // Resize + compress to keep base64 manageable
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const MAX = 900;
+      let { width, height } = img;
+      if (width > MAX || height > MAX) {
+        const ratio = Math.min(MAX / width, MAX / height);
+        width = Math.round(width * ratio);
+        height = Math.round(height * ratio);
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+      ctx.drawImage(img, 0, 0, width, height);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.82);
+      setTopicImage(dataUrl);
+    };
+    img.src = url;
+  }, []);
 
   // Wczytaj historię z pliku przy starcie
   useEffect(() => {
@@ -615,26 +648,41 @@ const AppInner: React.FC<{
 
   // ── Enqueue topics via server ────────────────────────────────────────────────
   const enqueueTopics = async () => {
-    const topics = input.split('\n').map(t => t.trim()).filter(Boolean);
-    if (topics.length === 0) return;
+    const rawTopics = input.split('\n').map(t => t.trim()).filter(Boolean);
+    // Allow submit with image even if topic is empty
+    const hasImage = !!topicImage;
+    if (rawTopics.length === 0 && !hasImage) return;
+    const topics = rawTopics.length > 0 ? rawTopics : [''];
     setInput('');
+    const capturedImage = topicImage;
+    const capturedImageName = topicImageName;
+    setTopicImage(null);
+    setTopicImageName('');
 
     // Optimistic local entries while server responds
     const tempItems: QueueItem[] = topics.map(topic => ({
       qid: `tmp-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-      topic,
+      topic: topic || (capturedImage ? `📷 ${capturedImageName || 'Image'}` : ''),
       status: 'pending',
       targetLang,
     }));
     setQueue(prev => [...prev, ...tempItems]);
 
     // Create server-side jobs and replace temp entries with real IDs
+    // When image is attached, only send 1 job (the first topic as context hint)
+    const jobTopics = hasImage ? [topics[0]] : topics;
     const settled = await Promise.allSettled(
-      topics.map((topic, i) =>
+      jobTopics.map((topic, i) =>
         fetch('/api/jobs', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ topic, targetLang, model: activeModel, apiKey }),
+          body: JSON.stringify({
+            topic,
+            targetLang,
+            model: activeModel,
+            apiKey,
+            ...(capturedImage && i === 0 ? { imageData: capturedImage } : {}),
+          }),
         })
           .then(r => r.ok ? r.json() : Promise.reject(new Error('Server error')))
           .then(({ jobId }: { jobId: string }) => ({ tempQid: tempItems[i].qid, jobId, topic }))
@@ -670,6 +718,12 @@ const AppInner: React.FC<{
     e.preventDefault();
     enqueueTopics();
   };
+
+  const handleImageDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    const file = e.dataTransfer.files[0];
+    if (file) handleImageSelect(file);
+  }, [handleImageSelect]);
 
   const removeQueueItem = async (qid: string) => {
     // Don't remove running jobs
@@ -776,6 +830,15 @@ const AppInner: React.FC<{
 
   const totalPages = Math.ceil(filteredHistory.length / ITEMS_PER_PAGE);
   const pagedHistory = filteredHistory.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+
+  if (showTextCorrection) {
+    return (
+      <TextCorrectionView
+        onClose={() => setShowTextCorrection(false)}
+        initialLang={targetLang}
+      />
+    );
+  }
 
   if (showExercisesView) {
     return (
@@ -894,6 +957,18 @@ const AppInner: React.FC<{
                 : <MoonIcon className="w-4 h-4 theme-icon-enter" />
               }
             </button>
+            {/* Korektor tekstu */}
+            <button
+              onClick={() => setShowTextCorrection(true)}
+              title={l === 'pl' ? 'Korektor tekstu' : l === 'en' ? 'Text corrector' : l === 'fr' ? 'Correcteur de texte' : l === 'es' ? 'Corrector de texto' : l === 'de' ? 'Textkorrektur' : 'Correttore testo'}
+              className="nav-icon-btn hidden sm:flex"
+              style={{ width: 'auto', padding: '0 10px', gap: 4 }}
+            >
+              <PencilSquareIcon className="w-3.5 h-3.5" />
+              <span className="text-xs font-medium">
+                {l === 'pl' ? 'Korektor' : l === 'en' ? 'Corrector' : l === 'fr' ? 'Correcteur' : l === 'es' ? 'Corrector' : l === 'de' ? 'Korrektur' : 'Correttore'}
+              </span>
+            </button>
             {/* Ćwiczenia */}
             <button
               onClick={() => setShowExercisesView(true)}
@@ -934,7 +1009,42 @@ const AppInner: React.FC<{
 
             <form onSubmit={handleSubmit} className="relative max-w-lg mx-auto w-full group">
               <div className="absolute -inset-0.5 bg-gradient-to-r from-emerald-400 to-teal-500 rounded-xl blur opacity-15 group-hover:opacity-30 transition duration-500" />
-              <div className="relative rounded-xl shadow-lg" style={{ background: 'var(--c-surface)' }}>
+              <div
+                className="relative rounded-xl shadow-lg"
+                style={{ background: 'var(--c-surface)' }}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={handleImageDrop}
+              >
+                {/* Image preview */}
+                {topicImage && (
+                  <div className="flex items-center gap-2 px-3 pt-3 pb-1">
+                    <div className="relative shrink-0">
+                      <img
+                        src={topicImage}
+                        alt="Podgląd tematu"
+                        className="w-14 h-14 object-cover rounded-lg border"
+                        style={{ borderColor: 'var(--c-border)' }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => { setTopicImage(null); setTopicImageName(''); }}
+                        className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full flex items-center justify-center"
+                        style={{ background: '#ef4444', color: '#fff' }}
+                        title="Usuń zdjęcie"
+                      >
+                        <XCircleIcon className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold truncate" style={{ color: 'var(--c-text)' }}>
+                        📷 {topicImageName || (l === 'pl' ? 'Zdjęcie' : 'Image')}
+                      </p>
+                      <p className="text-[10px]" style={{ color: 'var(--c-muted)' }}>
+                        {l === 'pl' ? 'AI wygeneruje lekcję na podstawie obrazka' : l === 'en' ? 'AI will generate lesson from this image' : 'AI generará lección desde esta imagen'}
+                      </p>
+                    </div>
+                  </div>
+                )}
                 <textarea
                   rows={Math.min(Math.max(input.split('\n').length, 2), 8)}
                   value={input}
@@ -943,36 +1053,68 @@ const AppInner: React.FC<{
                     // Enter → submit; Shift+Enter → nowa linia (domyślnie)
                     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); enqueueTopics(); }
                   }}
-                  placeholder={L.placeholder}
-                  className="w-full px-4 py-3.5 pr-14 rounded-xl bg-transparent border-0 focus:ring-0 text-sm outline-none resize-none leading-relaxed"
+                  placeholder={topicImage
+                    ? (l === 'pl' ? 'Dodatkowy kontekst (opcjonalnie)…' : l === 'en' ? 'Additional context (optional)…' : 'Contexto adicional (opcional)…')
+                    : L.placeholder}
+                  className="w-full px-4 py-3.5 pr-24 rounded-xl bg-transparent border-0 focus:ring-0 text-sm outline-none resize-none leading-relaxed"
                   style={{ color: 'var(--c-text)', minHeight: 52 }}
                 />
-                <button
-                  type="submit"
-                  disabled={!input.trim()}
-                  className="absolute right-2 bottom-2 p-2 rounded-lg transition-all active:scale-95 disabled:opacity-40"
-                  style={{ background: 'var(--c-text)', color: '#fff' }}
-                  title={l === 'pl' ? 'Dodaj do kolejki (Enter)' : l === 'en' ? 'Add to queue (Enter)' : l === 'fr' ? 'Ajouter à la file (Entrée)' : l === 'es' ? 'Añadir a la cola (Enter)' : 'Aggiungi alla coda (Enter)'}
-                >
-                  <PlusIcon className="w-4 h-4" />
-                </button>
+                {/* Buttons row */}
+                <div className="absolute right-2 bottom-2 flex items-center gap-1">
+                  {/* Image upload button */}
+                  <input
+                    ref={imageInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={e => {
+                      const file = e.target.files?.[0];
+                      if (file) handleImageSelect(file);
+                      e.target.value = '';
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => imageInputRef.current?.click()}
+                    className="p-2 rounded-lg transition-all active:scale-95"
+                    style={{
+                      background: topicImage ? 'var(--c-green)' : 'var(--c-bg)',
+                      color: topicImage ? '#fff' : 'var(--c-faint)',
+                      border: '1px solid var(--c-border)',
+                    }}
+                    title={l === 'pl' ? 'Dodaj zdjęcie jako temat' : l === 'en' ? 'Add image as topic' : 'Añadir imagen como tema'}
+                  >
+                    <PhotoIcon className="w-4 h-4" />
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={!input.trim() && !topicImage}
+                    className="p-2 rounded-lg transition-all active:scale-95 disabled:opacity-40"
+                    style={{ background: 'var(--c-text)', color: '#fff' }}
+                    title={l === 'pl' ? 'Dodaj do kolejki (Enter)' : l === 'en' ? 'Add to queue (Enter)' : l === 'fr' ? 'Ajouter à la file (Entrée)' : l === 'es' ? 'Añadir a la cola (Enter)' : 'Aggiungi alla coda (Enter)'}
+                  >
+                    <PlusIcon className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
               <p className="mt-1.5 text-[10px] text-center" style={{ color: 'var(--c-faint)' }}>
-                {input.split('\n').filter(t => t.trim()).length > 1
-                  ? (l === 'pl'
-                    ? `${input.split('\n').filter(t => t.trim()).length} tematów — Enter by dodać wszystkie`
-                    : l === 'en'
-                    ? `${input.split('\n').filter(t => t.trim()).length} topics — Enter to add all`
-                    : l === 'fr'
-                    ? `${input.split('\n').filter(t => t.trim()).length} sujets — Entrée pour tout ajouter`
-                    : l === 'es'
-                    ? `${input.split('\n').filter(t => t.trim()).length} temas — Enter para añadir todos`
-                    : `${input.split('\n').filter(t => t.trim()).length} argomenti — Enter per aggiungere tutti`)
-                  : (l === 'pl' ? 'Enter by dodać · Shift+Enter = nowa linia · kilka linii = równolegle'
-                    : l === 'en' ? 'Enter to add · Shift+Enter = new line · multiple lines = parallel'
-                    : l === 'fr' ? 'Entrée pour ajouter · Shift+Entrée = nouvelle ligne · plusieurs lignes = parallèle'
-                    : l === 'es' ? 'Enter para añadir · Shift+Enter = nueva línea · varias líneas = paralelo'
-                    : 'Enter per aggiungere · Shift+Enter = nuova riga · più righe = parallelo')
+                {topicImage
+                  ? (l === 'pl' ? '📷 Lekcja zostanie wygenerowana na podstawie zdjęcia' : l === 'en' ? '📷 Lesson will be generated from the image' : '📷 Lección generada desde imagen')
+                  : input.split('\n').filter(t => t.trim()).length > 1
+                    ? (l === 'pl'
+                      ? `${input.split('\n').filter(t => t.trim()).length} tematów — Enter by dodać wszystkie`
+                      : l === 'en'
+                      ? `${input.split('\n').filter(t => t.trim()).length} topics — Enter to add all`
+                      : l === 'fr'
+                      ? `${input.split('\n').filter(t => t.trim()).length} sujets — Entrée pour tout ajouter`
+                      : l === 'es'
+                      ? `${input.split('\n').filter(t => t.trim()).length} temas — Enter para añadir todos`
+                      : `${input.split('\n').filter(t => t.trim()).length} argomenti — Enter per aggiungere tutti`)
+                    : (l === 'pl' ? 'Enter by dodać · Shift+Enter = nowa linia · kilka linii = równolegle · 📷 = zdjęcie jako temat'
+                      : l === 'en' ? 'Enter to add · Shift+Enter = new line · multiple lines = parallel · 📷 = image topic'
+                      : l === 'fr' ? 'Entrée pour ajouter · Shift+Entrée = nouvelle ligne · plusieurs lignes = parallèle · 📷 = image'
+                      : l === 'es' ? 'Enter para añadir · Shift+Enter = nueva línea · varias líneas = paralelo · 📷 = imagen'
+                      : 'Enter per aggiungere · Shift+Enter = nuova riga · più righe = parallelo · 📷 = immagine tema')
                 }
               </p>
             </form>

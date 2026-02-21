@@ -2598,3 +2598,234 @@ CRITICAL: Respond with ONLY a raw JSON object:
     return [];
   }
 }
+
+// ─── Image Analysis for Lesson Generation ─────────────────────────────────────
+
+/**
+ * Analyzes an image and returns a suitable lesson topic derived from its content.
+ * @param imageData - base64 data URL (e.g. "data:image/jpeg;base64,...")
+ * @param targetLang - target language code ('it', 'en', 'fr', etc.)
+ * @param contextHint - optional user-provided context text
+ * @param apiKey - OpenRouter API key
+ * @param model - optional model ID
+ */
+export async function analyzeImageForLesson(
+  imageData: string,
+  targetLang: string,
+  contextHint: string,
+  apiKey: string,
+  model?: string
+): Promise<string> {
+  const client = new OpenAI({
+    baseURL: "https://openrouter.ai/api/v1",
+    apiKey,
+    dangerouslyAllowBrowser: true,
+  });
+
+  const langNames: Record<string, string> = {
+    it: 'Italian', en: 'English', fr: 'French', es: 'Spanish',
+    de: 'German', cs: 'Czech', ru: 'Russian', pt: 'Portuguese', el: 'Greek',
+  };
+  const langName = langNames[targetLang] || 'Italian';
+  const contextNote = contextHint?.trim()
+    ? ` The user also provided this context: "${contextHint.trim()}".`
+    : '';
+
+  const response = await (client.chat.completions.create as Function)({
+    model: model || getSavedModel() || DEFAULT_MODEL,
+    messages: [
+      {
+        role: "user",
+        content: [
+          { type: "image_url", image_url: { url: imageData } },
+          {
+            type: "text",
+            text: `Look at this image carefully and suggest a specific, interesting topic for a ${langName} language learning lesson.${contextNote}
+
+The topic should be derived from what you actually see in the image — an object, scene, concept, activity, food, place, or cultural element visible in the photo.
+
+Respond with ONLY a JSON object, no other text:
+{"topic": "a clear, specific topic name in ${langName} suitable for a language lesson (2-6 words)", "topic_pl": "Polish translation of the topic"}`,
+          },
+        ],
+      },
+    ],
+    response_format: { type: "json_object" },
+    max_tokens: 150,
+  });
+
+  const content = response.choices[0]?.message?.content;
+  if (!content) throw new Error("Empty response from image analysis");
+
+  try {
+    const parsed = JSON.parse(content);
+    return parsed.topic || parsed.topic_pl || contextHint || "Image-based lesson";
+  } catch {
+    return contextHint || "Image-based lesson";
+  }
+}
+
+// ─── Text Correction Service ───────────────────────────────────────────────────
+
+export type CorrectionMode = 'quick' | 'detailed';
+
+export interface QuickCorrectionResult {
+  mode: 'quick';
+  original: string;
+  corrected: string;
+  has_errors: boolean;
+  language_detected: string;
+}
+
+export interface DetailedCorrectionResult {
+  mode: 'detailed';
+  original: string;
+  corrected: string;
+  language_detected: string;
+  has_errors: boolean;
+  score: number;
+  overall_assessment_pl: string;
+  register?: string;
+  errors: Array<{
+    type: 'grammar' | 'spelling' | 'style' | 'punctuation' | 'vocabulary' | 'syntax';
+    original: string;
+    corrected: string;
+    context_before?: string;
+    context_after?: string;
+    explanation_pl: string;
+    rule?: string;
+  }>;
+}
+
+export type CorrectionResult = QuickCorrectionResult | DetailedCorrectionResult;
+
+/**
+ * Corrects text using AI. Two modes:
+ * - 'quick': returns just the corrected text
+ * - 'detailed': returns structured JSON with per-error analysis
+ */
+export async function correctText(
+  text: string,
+  targetLang: string,
+  mode: CorrectionMode,
+  apiKey: string,
+  model?: string
+): Promise<CorrectionResult> {
+  const client = new OpenAI({
+    baseURL: "https://openrouter.ai/api/v1",
+    apiKey,
+    dangerouslyAllowBrowser: true,
+  });
+
+  const resolvedModel = model || getSavedModel() || DEFAULT_MODEL;
+
+  const langNames: Record<string, string> = {
+    it: 'Italian', en: 'English', fr: 'French', es: 'Spanish',
+    de: 'German', cs: 'Czech', ru: 'Russian', pt: 'Portuguese', el: 'Greek',
+  };
+  const langName = langNames[targetLang] || 'Italian';
+
+  if (mode === 'quick') {
+    const response = await client.chat.completions.create({
+      model: resolvedModel,
+      messages: [
+        {
+          role: "system",
+          content: `You are an expert ${langName} language corrector. Your task is to correct text written in ${langName}, fixing all grammar, spelling, punctuation, vocabulary, and style errors. Return ONLY a JSON object.`,
+        },
+        {
+          role: "user",
+          content: `Correct the following ${langName} text. Fix all errors (grammar, spelling, punctuation, vocabulary, style) and return the improved version.
+
+Text to correct:
+"""
+${text}
+"""
+
+Respond with ONLY this JSON object:
+{
+  "original": "the original text verbatim",
+  "corrected": "the fully corrected text",
+  "has_errors": true or false,
+  "language_detected": "name of the detected language in Polish (e.g. 'włoski', 'angielski')"
+}`,
+        },
+      ],
+      response_format: { type: "json_object" },
+      max_tokens: 2048,
+    });
+
+    const content = response.choices[0]?.message?.content;
+    if (!content) throw new Error("Empty response");
+    const parsed = JSON.parse(content);
+    return {
+      mode: 'quick',
+      original: text,
+      corrected: parsed.corrected || text,
+      has_errors: parsed.has_errors ?? false,
+      language_detected: parsed.language_detected || langName,
+    };
+
+  } else {
+    // Detailed mode
+    const response = await client.chat.completions.create({
+      model: resolvedModel,
+      messages: [
+        {
+          role: "system",
+          content: `You are an expert ${langName} language teacher and corrector specializing in helping Polish speakers. Analyze text written in ${langName} and provide a thorough, pedagogical correction with detailed explanations in Polish. Return ONLY a JSON object.`,
+        },
+        {
+          role: "user",
+          content: `Perform a detailed correction of the following ${langName} text. Identify ALL errors (grammar, spelling, punctuation, vocabulary, style, syntax) and explain each one thoroughly in Polish.
+
+Text to correct:
+"""
+${text}
+"""
+
+Respond with ONLY this JSON object:
+{
+  "original": "the original text verbatim",
+  "corrected": "the fully corrected text",
+  "language_detected": "name of the detected language in Polish (e.g. 'włoski', 'angielski')",
+  "has_errors": true or false,
+  "score": 0-100 (quality score: 100 = perfect, 0 = very poor),
+  "overall_assessment_pl": "2-3 sentence overall assessment of the text quality and main issues, in Polish",
+  "register": "formal|informal|colloquial|literary|mixed",
+  "errors": [
+    {
+      "type": "grammar|spelling|style|punctuation|vocabulary|syntax",
+      "original": "the exact incorrect phrase or word from the text",
+      "corrected": "the correct version",
+      "context_before": "up to 5 words before the error for context",
+      "context_after": "up to 5 words after the error for context",
+      "explanation_pl": "2-4 sentence explanation in Polish: what is wrong, why it's wrong, what rule applies, how to remember",
+      "rule": "the grammar/spelling rule name or principle (brief, in Polish)"
+    }
+  ]
+}
+
+If there are no errors, return an empty errors array and score of 100.`,
+        },
+      ],
+      response_format: { type: "json_object" },
+      max_tokens: 4096,
+    });
+
+    const content = response.choices[0]?.message?.content;
+    if (!content) throw new Error("Empty response");
+    const parsed = JSON.parse(content);
+    return {
+      mode: 'detailed',
+      original: text,
+      corrected: parsed.corrected || text,
+      language_detected: parsed.language_detected || langName,
+      has_errors: parsed.has_errors ?? (parsed.errors?.length > 0),
+      score: parsed.score ?? 100,
+      overall_assessment_pl: parsed.overall_assessment_pl || '',
+      register: parsed.register,
+      errors: Array.isArray(parsed.errors) ? parsed.errors : [],
+    };
+  }
+}
