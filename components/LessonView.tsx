@@ -24,7 +24,6 @@ import {
   XMarkIcon,
   ArrowRightIcon,
   CheckIcon,
-  TrophyIcon,
 } from '@heroicons/react/24/outline';
 import { CheckCircleIcon, StarIcon as StarSolidIcon } from '@heroicons/react/24/solid';
 
@@ -301,234 +300,6 @@ export function toggleFavorite(id: string): boolean {
   saveFavorites(favs);
   return favs.has(id);
 }
-
-// ─── Flashcard Quiz ───────────────────────────────────────────────────────────
-
-type QuizStep = 'question' | 'revealed' | 'done';
-
-interface QuizState {
-  index: number;
-  step: QuizStep;
-  correct: number;
-  wrong: number;
-  answers: ('correct' | 'wrong' | null)[];
-}
-
-const FlashcardQuiz: React.FC<{
-  lesson: import('../types').Lesson;
-  onClose: () => void;
-}> = ({ lesson, onClose }) => {
-  const { globalLang: l, targetLang } = useLang();
-  const isEnQ = targetLang === 'en';
-  const isFrQ = targetLang === 'fr';
-  const isEsQ = targetLang === 'es';
-  const isDeQ = targetLang === 'de';
-  const isCsQ = targetLang === 'cs';
-  const t3q = (pl: string, it: string, en: string, fr?: string, es?: string, de?: string, cs?: string) => l === 'pl' ? pl : isEnQ ? en : isFrQ ? (fr ?? en) : isEsQ ? (es ?? it) : isDeQ ? (de ?? it) : isCsQ ? (cs ?? it) : it;
-  const items = lesson.vocabulary;
-  const [state, setState] = useState<QuizState>({
-    index: 0,
-    step: 'question',
-    correct: 0,
-    wrong: 0,
-    answers: new Array(items.length).fill(null),
-  });
-
-  const current = items[state.index];
-  const pct = Math.round((state.index / items.length) * 100);
-
-  const reveal = () => setState(s => ({ ...s, step: 'revealed' }));
-
-  const answer = (ok: boolean) => {
-    setState(s => {
-      const answers = [...s.answers];
-      answers[s.index] = ok ? 'correct' : 'wrong';
-      const nextIndex = s.index + 1;
-      return {
-        ...s,
-        index: nextIndex,
-        step: nextIndex >= items.length ? 'done' : 'question',
-        correct: s.correct + (ok ? 1 : 0),
-        wrong: s.wrong + (ok ? 0 : 1),
-        answers,
-      };
-    });
-  };
-
-  const restart = () => setState({
-    index: 0,
-    step: 'question',
-    correct: 0,
-    wrong: 0,
-    answers: new Array(items.length).fill(null),
-  });
-
-  // Close on Escape
-  useEffect(() => {
-    const h = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-      if (state.step === 'question' && e.key === ' ') { e.preventDefault(); reveal(); }
-      if (state.step === 'revealed') {
-        if (e.key === 'ArrowRight' || e.key === 'Enter') answer(true);
-        if (e.key === 'ArrowLeft')  answer(false);
-      }
-    };
-    window.addEventListener('keydown', h);
-    return () => window.removeEventListener('keydown', h);
-  }, [state.step, state.index]);
-
-  const LL = {
-    title:      t3q('Powtórka słownictwa',         'Ripasso Vocabolario', 'Vocabulary review',          'Révision du vocabulaire', 'Repaso de vocabulario', 'Vokabelwiederholung'),
-    question:   t3q('Jak to przetłumaczyć?',        'Come si traduce?',    'How do you translate this?', 'Comment traduire ceci ?', '¿Cómo se traduce?',     'Wie übersetzt man das?'),
-    reveal:     t3q('Pokaż odpowiedź',              'Mostra risposta',     'Show answer',                'Voir la réponse',         'Ver la respuesta',      'Antwort zeigen'),
-    knew:       t3q('Wiedziałem ✓',                 'Sapevo ✓',            'Knew it ✓',                  'Je savais ✓',             'Lo sabía ✓',            'Wusste ich ✓'),
-    didntKnow:  t3q('Nie wiedziałem ✗',             'Non sapevo ✗',        "Didn't know ✗",              'Je ne savais pas ✗',      'No lo sabía ✗',         'Wusste ich nicht ✗'),
-    results:    t3q('Wyniki',                       'Risultati',           'Results',                    'Résultats',               'Resultados',            'Ergebnisse'),
-    score:      (c: number, tot: number) => t3q(`${c} / ${tot} poprawnych`, `${c} / ${tot} corrette`, `${c} / ${tot} correct`, `${c} / ${tot} correct`, `${c} / ${tot} correctas`, `${c} / ${tot} richtig`),
-    great:      t3q('Świetna robota! 🎉',           'Ottimo lavoro! 🎉',   'Great job! 🎉',              'Excellent travail ! 🎉',  '¡Excelente trabajo! 🎉','Tolle Arbeit! 🎉'),
-    again:      t3q('Spróbuj jeszcze raz',          'Riprova',             'Try again',                  'Réessayer',               'Intentar de nuevo',     'Nochmal versuchen'),
-    close:      t3q('Zamknij',                      'Chiudi',              'Close',                      'Fermer',                  'Cerrar',                'Schließen'),
-    hint:       t3q('Spacja = pokaż · ← nie wiem · → wiem', 'Spazio = mostra · ← sbagliato · → corretto', 'Space = show · ← wrong · → correct', 'Espace = voir · ← non · → oui', 'Espacio = ver · ← no · → sí', 'Leertaste = zeigen · ← falsch · → richtig'),
-    word:       t3q('Słowo',                        'Parola italiana',     'Word',                       'Mot français',            'Palabra española',      'Deutsches Wort'),
-    meaning:    t3q('Znaczenie',                    'Significato',         'Meaning',                    'Signification',           'Significado',           'Bedeutung'),
-  };
-
-  const scorePercent = state.index > 0 ? Math.round((state.correct / state.index) * 100) : 0;
-
-  return (
-    <div className="quiz-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="quiz-card" style={{ maxWidth: 480 }}>
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 py-3.5 border-b" style={{ borderColor: 'var(--c-border)' }}>
-          <div className="flex items-center gap-2">
-            <TrophyIcon className="w-4 h-4" style={{ color: 'var(--c-green)' }} />
-            <span className="font-bold text-sm" style={{ color: 'var(--c-text)' }}>{LL.title}</span>
-          </div>
-          <div className="flex items-center gap-3">
-            {state.step !== 'done' && (
-              <span className="text-xs font-bold" style={{ color: 'var(--c-muted)' }}>
-                {state.index + 1} / {items.length}
-              </span>
-            )}
-            <button onClick={onClose} className="p-1 rounded-full" style={{ color: 'var(--c-faint)' }}>
-              <XMarkIcon className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-
-        {/* Progress track */}
-        {state.step !== 'done' && (
-          <div className="quiz-progress-track">
-            <div className="quiz-progress-fill" style={{ width: `${pct}%` }} />
-          </div>
-        )}
-
-        {state.step === 'done' ? (
-          /* ── Results ── */
-          <div className="quiz-card-inner gap-4" style={{ cursor: 'default' }}>
-            <div className="text-5xl quiz-result-icon" style={{ lineHeight: 1 }}>
-              {state.correct >= Math.ceil(items.length * 0.8) ? '🏆' : state.correct >= Math.ceil(items.length * 0.5) ? '📚' : '💪'}
-            </div>
-            <div>
-              <p className="text-xl font-bold font-serif" style={{ color: 'var(--c-text)' }}>{LL.results}</p>
-              <p className="text-sm mt-0.5" style={{ color: 'var(--c-muted)' }}>{LL.score(state.correct, items.length)}</p>
-            </div>
-            {/* Score dots */}
-            <div className="flex flex-wrap justify-center gap-1.5 max-w-xs">
-              {state.answers.map((a, i) => (
-                <div key={i} className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold text-white"
-                  style={{ background: a === 'correct' ? 'var(--c-green)' : '#ef4444' }}
-                  title={items[i].word}>
-                  {a === 'correct' ? '✓' : '✗'}
-                </div>
-              ))}
-            </div>
-            <p className="text-sm" style={{ color: scorePercent >= 80 ? 'var(--c-green)' : 'var(--c-muted)' }}>
-              {scorePercent >= 80 ? LL.great : `${scorePercent}%`}
-            </p>
-            <div className="flex gap-2">
-              <button onClick={restart} className="px-4 py-2 rounded-lg text-xs font-bold border transition-colors"
-                style={{ border: '1px solid var(--c-border)', background: 'var(--c-bg)', color: 'var(--c-text)' }}>
-                {LL.again}
-              </button>
-              <button onClick={onClose} className="px-4 py-2 rounded-lg text-xs font-bold text-white transition-colors"
-                style={{ background: 'var(--c-green)' }}>
-                {LL.close}
-              </button>
-            </div>
-          </div>
-        ) : (
-          /* ── Question / Revealed ── */
-          <>
-            <div className="quiz-card-inner quiz-flip" key={`${state.index}-${state.step}`}
-              onClick={state.step === 'question' ? reveal : undefined}
-              style={{ cursor: state.step === 'question' ? 'pointer' : 'default' }}>
-              {/* Word front */}
-              <div>
-                <p className="micro-label mb-1.5" style={{ color: 'var(--c-faint)' }}>{LL.word}</p>
-                <p className="text-3xl font-serif font-bold" style={{ color: 'var(--c-text)' }}>{current.word}</p>
-                {current.ipa && (
-                  <p className="text-xs font-mono mt-1" style={{ color: 'var(--c-faint)' }}>{current.ipa}</p>
-                )}
-              </div>
-
-              {state.step === 'question' ? (
-                <button
-                  className="mt-2 px-6 py-2 rounded-full text-sm font-semibold text-white"
-                  style={{ background: 'var(--c-green)' }}
-                  onClick={reveal}
-                >
-                  {LL.reveal}
-                </button>
-              ) : (
-                /* Answer revealed */
-                <div className="w-full space-y-2 animate-fade-in">
-                  <div className="p-3 rounded-xl text-sm" style={{ background: 'var(--c-bg)', border: '1px solid var(--c-border)' }}>
-                    <p className="micro-label mb-1" style={{ color: 'var(--c-faint)' }}>{LL.meaning}</p>
-                    <p className="font-semibold" style={{ color: 'var(--c-text)' }}>{current.translation}</p>
-                    {(l === 'pl' ? current.definition.pl : (isEnQ ? current.definition.en : isFrQ ? current.definition.fr : isEsQ ? current.definition.es : isDeQ ? current.definition.de : isCsQ ? current.definition.cs : current.definition.it) ?? current.definition.pl) && (
-                      <p className="text-xs mt-0.5 italic leading-relaxed" style={{ color: 'var(--c-muted)' }}>
-                        {l === 'pl' ? current.definition.pl : (isEnQ ? current.definition.en : isFrQ ? current.definition.fr : isEsQ ? current.definition.es : isDeQ ? current.definition.de : isCsQ ? current.definition.cs : current.definition.it) ?? current.definition.pl}
-                      </p>
-                    )}
-                  </div>
-                  <div className="flex gap-2 w-full">
-                    <button
-                      onClick={() => answer(false)}
-                      className="flex-1 py-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors"
-                      style={{ background: 'rgba(239,68,68,.1)', color: '#dc2626', border: '1px solid rgba(239,68,68,.2)' }}
-                    >
-                      <XMarkIcon className="w-4 h-4" />
-                      {LL.didntKnow}
-                    </button>
-                    <button
-                      onClick={() => answer(true)}
-                      className="flex-1 py-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors"
-                      style={{ background: 'var(--c-green-dim)', color: 'var(--c-green)', border: '1px solid rgba(0,140,69,.2)' }}
-                    >
-                      <CheckIcon className="w-4 h-4" />
-                      {LL.knew}
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Keyboard hint */}
-            <div className="px-5 pb-3 flex items-center justify-center gap-1 text-[10px]" style={{ color: 'var(--c-faint)' }}>
-              {state.step === 'question' ? (
-                <><span className="kbd">Space</span><span className="ml-1">= pokaż</span></>
-              ) : (
-                <><span className="kbd">←</span><span className="mx-1">nie</span>
-                  <span className="kbd">→</span><span className="ml-1">tak</span></>
-              )}
-            </div>
-          </>
-        )}
-      </div>
-    </div>
-  );
-};
 
 // ─── Badge ────────────────────────────────────────────────────────────────────
 
@@ -821,9 +592,6 @@ export const LessonView: React.FC<LessonViewProps> = ({ lesson, onBack, onChange
   const [isFav, setIsFav] = useState(() => getFavorites().has(lesson.id));
   const handleToggleFav = () => setIsFav(toggleFavorite(lesson.id));
 
-  // Quiz mode
-  const [showQuiz, setShowQuiz] = useState(false);
-
   // Exercise mode
   const [showExerciseRunner, setShowExerciseRunner] = useState(false);
   const [exerciseSet, setExerciseSet] = useState<ExerciseSet | null>(null);
@@ -879,18 +647,14 @@ export const LessonView: React.FC<LessonViewProps> = ({ lesson, onBack, onChange
     }
   };
 
-  // Keyboard shortcuts: Escape = back, Q = quiz
+  // Keyboard shortcut: Escape = back to library
   useEffect(() => {
-    if (showQuiz) return; // handled inside quiz component
     const h = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onBack();
-      if ((e.key === 'q' || e.key === 'Q') && !e.ctrlKey && !e.metaKey && !(e.target instanceof HTMLInputElement)) {
-        setShowQuiz(true);
-      }
     };
     window.addEventListener('keydown', h);
     return () => window.removeEventListener('keydown', h);
-  }, [showQuiz, onBack]);
+  }, [onBack]);
 
   const scrollTo = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
 
@@ -961,9 +725,6 @@ export const LessonView: React.FC<LessonViewProps> = ({ lesson, onBack, onChange
 
       {/* ── Reading progress bar ────────────────────────────────────────────── */}
       <div className="reading-progress-bar" style={{ width: `${readingProgress}%` }} />
-
-      {/* ── Flashcard Quiz overlay ──────────────────────────────────────────── */}
-      {showQuiz && <FlashcardQuiz lesson={lesson} onClose={() => setShowQuiz(false)} />}
 
       {/* ── Exercise Runner overlay ─────────────────────────────────────────── */}
       {showExerciseRunner && exerciseSet && (
@@ -1062,17 +823,6 @@ export const LessonView: React.FC<LessonViewProps> = ({ lesson, onBack, onChange
               className={`nav-icon-btn ${isFav ? 'fav-active' : ''}`}
             >
               {isFav ? <StarSolidIcon className="w-4 h-4" style={{ color: '#f59e0b' }} /> : <StarIcon className="w-4 h-4" />}
-            </button>
-
-            {/* Quiz */}
-            <button
-              onClick={() => setShowQuiz(true)}
-              title={t3('Quiz słownictwa', 'Quiz vocabolario', 'Vocabulary quiz', 'Quiz de vocabulaire', 'Quiz de vocabulario', 'Vokabelquiz') + ' [Q]'}
-              className="nav-icon-btn hidden sm:flex"
-              style={{ background: 'var(--c-green-dim)', color: 'var(--c-green)', borderColor: 'rgba(0,140,69,.2)', width: 'auto', padding: '0 10px', gap: 4 }}
-            >
-              <TrophyIcon className="w-3.5 h-3.5" />
-              <span className="text-xs font-bold">Quiz</span>
             </button>
 
             {/* Ćwiczenia */}
@@ -1198,16 +948,10 @@ export const LessonView: React.FC<LessonViewProps> = ({ lesson, onBack, onChange
                   )}
                 </div>
 
-                {/* Shortcuts hint */}
-                <div className="flex flex-col gap-1 pt-1 border-t" style={{ borderColor: 'var(--c-border-soft)' }}>
-                  <div className="flex items-center gap-1.5 text-[9px]" style={{ color: 'var(--c-faint)' }}>
-                    <span className="kbd">Q</span>
-                    <span>{t3('uruchom quiz', 'avvia quiz', 'start quiz', 'lancer le quiz', 'iniciar quiz', 'Quiz starten', 'spustit kvíz')}</span>
-                  </div>
-                  <div className="flex items-center gap-1.5 text-[9px]" style={{ color: 'var(--c-faint)' }}>
-                    <span className="kbd">Esc</span>
-                    <span>{t3('wróć do biblioteki', 'torna alla biblioteca', 'back to library', 'retour à la bibliothèque', 'volver a la biblioteca', 'zurück zur Bibliothek', 'zpět do knihovny')}</span>
-                  </div>
+                {/* Shortcut hint */}
+                <div className="flex items-center gap-1.5 text-[9px] pt-1 border-t" style={{ color: 'var(--c-faint)', borderColor: 'var(--c-border-soft)' }}>
+                  <span className="kbd">Esc</span>
+                  <span>{t3('wróć do biblioteki', 'torna alla biblioteca', 'back to library', 'retour à la bibliothèque', 'volver a la biblioteca', 'zurück zur Bibliothek', 'zpět do knihovny')}</span>
                 </div>
               </div>
             </div>
