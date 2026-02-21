@@ -207,3 +207,131 @@ export interface GenerationState {
   status: 'idle' | 'loading' | 'success' | 'error';
   error?: string;
 }
+
+// ─── Exercise System ──────────────────────────────────────────────────────────
+
+export type ExerciseType =
+  | 'multiple_choice'      // Wybór wielokrotny
+  | 'fill_blank'           // Uzupełnij lukę
+  | 'translation_tl_pl'    // Przetłumacz z TL na PL
+  | 'translation_pl_tl'    // Przetłumacz z PL na TL
+  | 'matching'             // Dopasuj pary
+  | 'word_order'           // Ułóż słowa w zdanie
+  | 'true_false'           // Prawda/Fałsz
+  | 'error_correction'     // Popraw błąd
+  | 'conjugation'          // Podaj formę odmiany
+  | 'gap_fill_wordbank'    // Uzupełnij z bankiem słów
+  | 'dialogue_completion'  // Uzupełnij dialog
+  | 'definition_match';    // Dopasuj do definicji
+
+export type ExerciseDifficulty = 'easy' | 'medium' | 'hard';
+
+export interface ExerciseBase {
+  id: string;
+  difficulty: ExerciseDifficulty;
+  focus: string;              // e.g. "słownictwo: cibo", "gramatyka: passato prossimo"
+  instruction_pl: string;     // instruction in Polish
+  instruction_tl?: string;    // instruction in target language
+  explanation_pl?: string;    // explanation shown after answering (Polish)
+  explanation_tl?: string;    // explanation in target language
+}
+
+export type Exercise = ExerciseBase & (
+  | {
+      type: 'multiple_choice';
+      question: string;         // question in target lang
+      question_pl?: string;     // optional Polish translation
+      options: string[];        // 4 options
+      correct_index: number;
+    }
+  | {
+      type: 'fill_blank';
+      sentence: string;         // sentence with ___ for blank
+      correct: string;          // correct word/phrase
+      hint?: string;            // grammar hint e.g. "czasownik 'essere', 3. os. l.mn."
+    }
+  | {
+      type: 'translation_tl_pl';
+      source: string;           // source sentence in target lang
+      correct: string;          // correct Polish translation
+      acceptable?: string[];    // alternative correct translations
+    }
+  | {
+      type: 'translation_pl_tl';
+      source: string;           // Polish source sentence
+      correct: string;          // correct target lang translation
+      acceptable?: string[];    // alternative correct translations
+    }
+  | {
+      type: 'matching';
+      pairs: Array<{ id: string; left: string; right: string }>;  // left = TL word, right = PL meaning
+    }
+  | {
+      type: 'word_order';
+      words: string[];          // shuffled words in target lang
+      correct: string;          // correct sentence
+      translation_hint?: string; // Polish meaning as hint
+    }
+  | {
+      type: 'true_false';
+      statement: string;        // statement in target lang
+      statement_pl?: string;    // optional Polish translation
+      is_true: boolean;
+      correction?: string;      // correct version if statement is false
+    }
+  | {
+      type: 'error_correction';
+      incorrect_sentence: string;
+      correct_sentence: string;
+      error_type: string;       // e.g. "błąd gramatyczny – rodzaj rzeczownika"
+    }
+  | {
+      type: 'conjugation';
+      verb: string;             // infinitive
+      tense: string;            // tense name in Polish
+      pronoun: string;          // e.g. "io", "tu", "lui/lei"
+      pronoun_pl: string;       // e.g. "ja", "ty", "on/ona"
+      correct: string;          // correct conjugated form
+    }
+  | {
+      type: 'gap_fill_wordbank';
+      text: string;             // text with _1_, _2_ etc. markers
+      word_bank: string[];      // words including distractors
+      correct_answers: string[]; // ordered correct answers for each gap
+    }
+  | {
+      type: 'dialogue_completion';
+      context_pl: string;       // brief description of context in Polish
+      dialogue: Array<{
+        speaker: string;
+        text: string;
+        is_blank?: boolean;     // this line needs to be filled
+      }>;
+      options: string[];        // multiple choice options
+      correct_index: number;
+    }
+  | {
+      type: 'definition_match';
+      definition: string;       // definition in target lang
+      definition_pl?: string;   // definition in Polish
+      options: string[];        // 4 words to choose from
+      correct_index: number;
+    }
+);
+
+export interface ExerciseSet {
+  lessonId: string;
+  lessonEmoji: string;
+  lessonTopic: Bilingual;
+  lessonSubtitle?: Bilingual;
+  targetLang: TargetLang;
+  difficulty_level: DifficultyLevel;
+  generatedAt: number;
+  exercises: Exercise[];
+}
+
+export interface ExerciseAttempt {
+  exerciseId: string;
+  correct: boolean;
+  userAnswer?: string;
+}

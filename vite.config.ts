@@ -7,12 +7,17 @@ import react from '@vitejs/plugin-react';
 const HISTORY_DIR = path.resolve(__dirname, 'history');
 // Katalog z zadaniami generowania (persystencja przez restarty)
 const JOBS_DIR = path.resolve(__dirname, 'history', 'jobs');
+// Katalog z zestawami ćwiczeń
+const EXERCISES_DIR = path.resolve(__dirname, 'history', 'exercises');
 
 function ensureHistoryDir() {
   if (!fs.existsSync(HISTORY_DIR)) fs.mkdirSync(HISTORY_DIR, { recursive: true });
 }
 function ensureJobsDir() {
   if (!fs.existsSync(JOBS_DIR)) fs.mkdirSync(JOBS_DIR, { recursive: true });
+}
+function ensureExercisesDir() {
+  if (!fs.existsSync(EXERCISES_DIR)) fs.mkdirSync(EXERCISES_DIR, { recursive: true });
 }
 
 // ─── Server-side job types ────────────────────────────────────────────────────
@@ -253,6 +258,74 @@ function historyApiPlugin() {
         }
 
         next();
+      });
+
+      // ── GET /api/exercises (list all) ────────────────────────────────────────
+      server.middlewares.use('/api/exercises', (req: any, res: any, next: any) => {
+        if (req.url !== '/' && req.url !== '') { next(); return; }
+        res.setHeader('Content-Type', 'application/json');
+
+        if (req.method === 'GET') {
+          try {
+            ensureExercisesDir();
+            const files = fs.readdirSync(EXERCISES_DIR).filter((f: string) => f.endsWith('.json'));
+            const sets = files
+              .map((f: string) => {
+                try { return JSON.parse(fs.readFileSync(path.join(EXERCISES_DIR, f), 'utf-8')); }
+                catch { return null; }
+              })
+              .filter(Boolean)
+              .sort((a: any, b: any) => (b.generatedAt ?? 0) - (a.generatedAt ?? 0));
+            res.end(JSON.stringify(sets));
+          } catch {
+            res.end('[]');
+          }
+          return;
+        }
+        next();
+      });
+
+      // ── /api/exercises/:lessonId ─────────────────────────────────────────────
+      server.middlewares.use('/api/exercises/', (req: any, res: any, next: any) => {
+        const match = req.url?.match(/^\/([^/?]+)$/);
+        if (!match) { next(); return; }
+        const lessonId = match[1];
+        const file = path.join(EXERCISES_DIR, `${lessonId}.json`);
+
+        res.setHeader('Content-Type', 'application/json');
+
+        if (req.method === 'GET') {
+          try {
+            if (!fs.existsSync(file)) { res.statusCode = 404; res.end('null'); return; }
+            res.end(fs.readFileSync(file, 'utf-8'));
+          } catch { res.statusCode = 500; res.end('null'); }
+          return;
+        }
+
+        if (req.method === 'POST' || req.method === 'PUT') {
+          let body = '';
+          req.on('data', (chunk: any) => { body += chunk; });
+          req.on('end', () => {
+            try {
+              JSON.parse(body); // validation
+              ensureExercisesDir();
+              fs.writeFileSync(file, body, 'utf-8');
+              res.end('{"ok":true}');
+            } catch { res.statusCode = 400; res.end('{"ok":false}'); }
+          });
+          return;
+        }
+
+        if (req.method === 'DELETE') {
+          try {
+            if (fs.existsSync(file)) fs.unlinkSync(file);
+            res.end('{"ok":true}');
+          } catch { res.statusCode = 500; res.end('{"ok":false}'); }
+          return;
+        }
+
+        res.statusCode = 405;
+        res.end('{"ok":false}');
       });
 
       // ── DELETE /api/jobs/:id + POST /api/jobs/:id/retry ────────────────────

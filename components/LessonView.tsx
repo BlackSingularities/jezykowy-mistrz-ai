@@ -28,10 +28,12 @@ import {
 } from '@heroicons/react/24/outline';
 import { CheckCircleIcon, StarIcon as StarSolidIcon } from '@heroicons/react/24/solid';
 
-import { Lesson, VocabularyItem, MistakeCategory, Register, DialogueTone, PartOfSpeech } from '../types';
+import { Lesson, VocabularyItem, MistakeCategory, Register, DialogueTone, PartOfSpeech, ExerciseSet } from '../types';
 import { useLang, useTheme, useFontSize } from '../context/LangContext';
 import { B } from './BilingualBlock';
 import { Flag, LangFlag } from './Flag';
+import { ExerciseRunner } from './ExerciseRunner';
+import { generateExercises, saveExerciseSet, loadExerciseSet } from '../services/exerciseService';
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
@@ -822,6 +824,41 @@ export const LessonView: React.FC<LessonViewProps> = ({ lesson, onBack, onChange
   // Quiz mode
   const [showQuiz, setShowQuiz] = useState(false);
 
+  // Exercise mode
+  const [showExerciseRunner, setShowExerciseRunner] = useState(false);
+  const [exerciseSet, setExerciseSet] = useState<ExerciseSet | null>(null);
+  const [generatingExercises, setGeneratingExercises] = useState(false);
+  const [exerciseGenError, setExerciseGenError] = useState('');
+  const [exerciseLoadStatus, setExerciseLoadStatus] = useState<'loading' | 'loaded' | 'none'>('loading');
+
+  // Load existing exercises for this lesson on mount
+  useEffect(() => {
+    loadExerciseSet(lesson.id).then(set => {
+      if (set) setExerciseSet(set);
+      setExerciseLoadStatus(set ? 'loaded' : 'none');
+    });
+  }, [lesson.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleGenerateExercises = async () => {
+    if (generatingExercises) return;
+    setGeneratingExercises(true);
+    setExerciseGenError('');
+    try {
+      const apiKey = localStorage.getItem('openrouter_api_key') || '';
+      if (!apiKey) { setExerciseGenError('Brak klucza API'); return; }
+      const set = await generateExercises(lesson, apiKey);
+      await saveExerciseSet(set);
+      setExerciseSet(set);
+      setExerciseLoadStatus('loaded');
+      setShowExerciseRunner(true);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setExerciseGenError(msg || 'Błąd generowania ćwiczeń');
+    } finally {
+      setGeneratingExercises(false);
+    }
+  };
+
   // Keyboard shortcuts: Escape = back, Q = quiz
   useEffect(() => {
     if (showQuiz) return; // handled inside quiz component
@@ -877,14 +914,15 @@ export const LessonView: React.FC<LessonViewProps> = ({ lesson, onBack, onChange
 
   const NAV_ITEMS = [
     { id: 'intro',    pl: 'Wstęp',       it: 'Intro',      en: 'Intro',      fr: 'Intro',       es: 'Intro',      de: 'Einleitung', cs: 'Úvod',     icon: SparklesIcon },
-    { id: 'vocab',    pl: 'Słownictwo',  it: 'Lessico',    en: 'Vocabulary', fr: 'Vocabulaire', es: 'Vocabulario',de: 'Wortschatz', cs: 'Slovní zásoba', icon: BookOpenIcon },
-    { id: 'grammar',  pl: 'Gramatyka',   it: 'Grammatica', en: 'Grammar',    fr: 'Grammaire',   es: 'Gramática',  de: 'Grammatik',  cs: 'Gramatika', icon: AcademicCapIcon },
-    { id: 'phrases',  pl: 'Zwroty',      it: 'Frasi',      en: 'Phrases',    fr: 'Phrases',     es: 'Frases',     de: 'Phrasen',    cs: 'Fráze',    icon: ChatBubbleBottomCenterTextIcon },
-    { id: 'mistakes', pl: 'Błędy',       it: 'Errori',     en: 'Mistakes',   fr: 'Erreurs',     es: 'Errores',    de: 'Fehler',     cs: 'Chyby',    icon: ExclamationTriangleIcon },
-    { id: 'story',    pl: 'Opowiadanie', it: 'Racconto',   en: 'Story',      fr: 'Histoire',    es: 'Historia',   de: 'Geschichte', cs: 'Příběh',   icon: BookmarkIcon },
-    { id: 'dialogue', pl: 'Dialog',      it: 'Dialogo',    en: 'Dialogue',   fr: 'Dialogue',    es: 'Diálogo',    de: 'Dialog',     cs: 'Dialog',   icon: LanguageIcon },
-    { id: 'culture',  pl: 'Kultura',     it: 'Cultura',    en: 'Culture',    fr: 'Culture',     es: 'Cultura',    de: 'Kultur',     cs: 'Kultura',  icon: GlobeEuropeAfricaIcon },
-    { id: 'gems',     pl: 'Perełki',     it: 'Gemme',      en: 'Gems',       fr: 'Joyaux',      es: 'Joyas',      de: 'Perlen',     cs: 'Klenoty',  icon: StarIcon },
+    { id: 'vocab',     pl: 'Słownictwo',  it: 'Lessico',    en: 'Vocabulary', fr: 'Vocabulaire', es: 'Vocabulario',de: 'Wortschatz', cs: 'Slovní zásoba', icon: BookOpenIcon },
+    { id: 'grammar',   pl: 'Gramatyka',   it: 'Grammatica', en: 'Grammar',    fr: 'Grammaire',   es: 'Gramática',  de: 'Grammatik',  cs: 'Gramatika', icon: AcademicCapIcon },
+    { id: 'phrases',   pl: 'Zwroty',      it: 'Frasi',      en: 'Phrases',    fr: 'Phrases',     es: 'Frases',     de: 'Phrasen',    cs: 'Fráze',    icon: ChatBubbleBottomCenterTextIcon },
+    { id: 'mistakes',  pl: 'Błędy',       it: 'Errori',     en: 'Mistakes',   fr: 'Erreurs',     es: 'Errores',    de: 'Fehler',     cs: 'Chyby',    icon: ExclamationTriangleIcon },
+    { id: 'story',     pl: 'Opowiadanie', it: 'Racconto',   en: 'Story',      fr: 'Histoire',    es: 'Historia',   de: 'Geschichte', cs: 'Příběh',   icon: BookmarkIcon },
+    { id: 'dialogue',  pl: 'Dialog',      it: 'Dialogo',    en: 'Dialogue',   fr: 'Dialogue',    es: 'Diálogo',    de: 'Dialog',     cs: 'Dialog',   icon: LanguageIcon },
+    { id: 'culture',   pl: 'Kultura',     it: 'Cultura',    en: 'Culture',    fr: 'Culture',     es: 'Cultura',    de: 'Kultur',     cs: 'Kultura',  icon: GlobeEuropeAfricaIcon },
+    { id: 'gems',      pl: 'Perełki',     it: 'Gemme',      en: 'Gems',       fr: 'Joyaux',      es: 'Joyas',      de: 'Perlen',     cs: 'Klenoty',  icon: StarIcon },
+    { id: 'exercises', pl: 'Ćwiczenia',   it: 'Esercizi',   en: 'Exercises',  fr: 'Exercices',   es: 'Ejercicios', de: 'Übungen',    cs: 'Cvičení',  icon: AcademicCapIcon },
   ];
 
   const speakerSides = useMemo<Record<string, 'left' | 'right'>>(() => {
@@ -906,6 +944,11 @@ export const LessonView: React.FC<LessonViewProps> = ({ lesson, onBack, onChange
 
       {/* ── Flashcard Quiz overlay ──────────────────────────────────────────── */}
       {showQuiz && <FlashcardQuiz lesson={lesson} onClose={() => setShowQuiz(false)} />}
+
+      {/* ── Exercise Runner overlay ─────────────────────────────────────────── */}
+      {showExerciseRunner && exerciseSet && (
+        <ExerciseRunner exerciseSet={exerciseSet} onClose={() => setShowExerciseRunner(false)} />
+      )}
 
       {/* ── Sticky top bar ─────────────────────────────────────────────────── */}
       <div className="glass-nav sticky top-0 z-50">
@@ -1012,6 +1055,28 @@ export const LessonView: React.FC<LessonViewProps> = ({ lesson, onBack, onChange
               <span className="text-xs font-bold">Quiz</span>
             </button>
 
+            {/* Ćwiczenia */}
+            <button
+              onClick={() => exerciseSet ? setShowExerciseRunner(true) : handleGenerateExercises()}
+              disabled={generatingExercises}
+              title={exerciseSet
+                ? t3('Ćwicz ze swoim zestawem', 'Esercizi generati', 'Practice exercises', 'Exercices générés', 'Ejercicios generados', 'Übungen starten')
+                : t3('Generuj ćwiczenia AI', 'Genera esercizi', 'Generate exercises', 'Générer des exercices', 'Generar ejercicios', 'Übungen generieren')}
+              className="nav-icon-btn hidden sm:flex disabled:opacity-50"
+              style={{ background: 'rgba(99,102,241,.08)', color: '#6366f1', borderColor: 'rgba(99,102,241,.2)', width: 'auto', padding: '0 10px', gap: 4 }}
+            >
+              {generatingExercises
+                ? <SparklesIcon className="w-3.5 h-3.5 animate-spin" />
+                : <AcademicCapIcon className="w-3.5 h-3.5" />}
+              <span className="text-xs font-bold">
+                {generatingExercises
+                  ? t3('Generuję…', 'Generando…', 'Generating…', 'Génération…', 'Generando…', 'Generiere…')
+                  : exerciseSet
+                    ? t3('Ćwiczenia', 'Esercizi', 'Exercises', 'Exercices', 'Ejercicios', 'Übungen')
+                    : t3('Generuj ćwiczenia', 'Genera esercizi', 'Generate exercises', 'Générer', 'Generar', 'Generieren')}
+              </span>
+            </button>
+
             {/* Klucz API */}
             {onChangeKey && (
               <button
@@ -1073,6 +1138,46 @@ export const LessonView: React.FC<LessonViewProps> = ({ lesson, onBack, onChange
                     </p>
                   </div>
                 )}
+                {/* Exercises panel in sidebar */}
+                <div className="pt-2 border-t" style={{ borderColor: 'var(--c-border-soft)' }}>
+                  {exerciseLoadStatus === 'loading' ? (
+                    <div className="flex items-center gap-1.5 text-[10px]" style={{ color: 'var(--c-faint)' }}>
+                      <SparklesIcon className="w-3 h-3 animate-pulse" />
+                      <span>{t3('Ładuję ćwiczenia…', 'Carico esercizi…', 'Loading exercises…', 'Chargement…', 'Cargando…', 'Lade Übungen…')}</span>
+                    </div>
+                  ) : exerciseSet ? (
+                    <button
+                      onClick={() => setShowExerciseRunner(true)}
+                      className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold transition-all"
+                      style={{ background: 'rgba(99,102,241,.08)', color: '#6366f1', border: '1px solid rgba(99,102,241,.2)' }}
+                    >
+                      <AcademicCapIcon className="w-3.5 h-3.5 shrink-0" />
+                      <span className="flex-1 text-left">
+                        {t3(`Ćwiczenia (${exerciseSet.exercises.length})`, `Esercizi (${exerciseSet.exercises.length})`, `Exercises (${exerciseSet.exercises.length})`, `Exercices (${exerciseSet.exercises.length})`, `Ejercicios (${exerciseSet.exercises.length})`, `Übungen (${exerciseSet.exercises.length})`)}
+                      </span>
+                    </button>
+                  ) : (
+                    <button
+                      onClick={handleGenerateExercises}
+                      disabled={generatingExercises}
+                      className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold transition-all disabled:opacity-50"
+                      style={{ background: 'rgba(99,102,241,.08)', color: '#6366f1', border: '1px solid rgba(99,102,241,.2)' }}
+                    >
+                      {generatingExercises
+                        ? <SparklesIcon className="w-3.5 h-3.5 animate-spin shrink-0" />
+                        : <SparklesIcon className="w-3.5 h-3.5 shrink-0" />}
+                      <span className="flex-1 text-left">
+                        {generatingExercises
+                          ? t3('Generuję ćwiczenia…', 'Generando…', 'Generating…', 'Génération…', 'Generando…', 'Generiere…')
+                          : t3('Generuj ćwiczenia AI', 'Genera esercizi', 'Generate exercises', 'Générer exercices', 'Generar ejercicios', 'Übungen generieren')}
+                      </span>
+                    </button>
+                  )}
+                  {exerciseGenError && (
+                    <p className="mt-1 text-[9px] leading-tight" style={{ color: 'var(--c-red)' }}>{exerciseGenError}</p>
+                  )}
+                </div>
+
                 {/* Shortcuts hint */}
                 <div className="flex flex-col gap-1 pt-1 border-t" style={{ borderColor: 'var(--c-border-soft)' }}>
                   <div className="flex items-center gap-1.5 text-[9px]" style={{ color: 'var(--c-faint)' }}>
@@ -1741,6 +1846,119 @@ export const LessonView: React.FC<LessonViewProps> = ({ lesson, onBack, onChange
                     </div>
                   </div>
                 )}
+              </div>
+            </section>
+
+            {/* ═══ ĆWICZENIA ═══════════════════════════════════════════════ */}
+            <section id="exercises">
+              <div className="card overflow-hidden"
+                style={{ background: 'linear-gradient(135deg,rgba(99,102,241,.06) 0%,rgba(139,92,246,.04) 100%)', border: '1px solid rgba(99,102,241,.15)' }}>
+                <div className="px-6 py-4 border-b flex items-center gap-2"
+                  style={{ borderColor: 'rgba(99,102,241,.15)' }}>
+                  <AcademicCapIcon className="w-4 h-4 shrink-0" style={{ color: '#6366f1' }} />
+                  <h2 className="text-base font-serif font-bold" style={{ color: 'var(--c-text)' }}>
+                    {t3('Ćwiczenia interaktywne', 'Esercizi interattivi', 'Interactive exercises', 'Exercices interactifs', 'Ejercicios interactivos', 'Interaktive Übungen')}
+                  </h2>
+                  {exerciseSet && (
+                    <span className="ml-auto px-2 py-0.5 rounded-full text-[10px] font-bold"
+                      style={{ background: 'rgba(99,102,241,.12)', color: '#6366f1' }}>
+                      {exerciseSet.exercises.length} {t3('ćwiczeń', 'esercizi', 'exercises', 'exercices', 'ejercicios', 'Übungen')}
+                    </span>
+                  )}
+                </div>
+                <div className="p-6">
+                  {exerciseSet ? (
+                    <div className="space-y-4">
+                      <p className="text-sm" style={{ color: 'var(--c-muted)' }}>
+                        {t3(
+                          `Wygenerowano ${exerciseSet.exercises.length} zróżnicowanych ćwiczeń na podstawie tej lekcji. Ćwiczenia obejmują różne typy zadań: wybór wielokrotny, tłumaczenia, uzupełnianie luk, dopasowywanie i wiele więcej.`,
+                          `Sono stati generati ${exerciseSet.exercises.length} esercizi variegati basati su questa lezione.`,
+                          `${exerciseSet.exercises.length} diverse exercises generated from this lesson. Exercises cover multiple types: multiple choice, translations, fill-in-the-blank, matching, and more.`,
+                          `${exerciseSet.exercises.length} exercices variés générés à partir de cette leçon.`,
+                          `${exerciseSet.exercises.length} ejercicios variados generados a partir de esta lección.`,
+                          `${exerciseSet.exercises.length} abwechslungsreiche Übungen zu dieser Lektion generiert.`
+                        )}
+                      </p>
+                      {/* Exercise type summary */}
+                      <div className="flex flex-wrap gap-2">
+                        {Array.from(new Set(exerciseSet.exercises.map(e => e.type))).map(type => {
+                          const count = exerciseSet.exercises.filter(e => e.type === type).length;
+                          const icons: Record<string, string> = {
+                            multiple_choice: '🔘', fill_blank: '✏️', translation_tl_pl: '🔄',
+                            translation_pl_tl: '↩️', matching: '🔗', word_order: '🔀',
+                            true_false: '⚖️', error_correction: '🔍', conjugation: '📝',
+                            gap_fill_wordbank: '🗃️', dialogue_completion: '💬', definition_match: '📖',
+                          };
+                          return (
+                            <span key={type} className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs"
+                              style={{ background: 'rgba(99,102,241,.08)', color: '#6366f1', border: '1px solid rgba(99,102,241,.15)' }}>
+                              {icons[type] ?? '📌'} {count}×
+                            </span>
+                          );
+                        })}
+                      </div>
+                      <div className="flex flex-wrap gap-3">
+                        <button
+                          onClick={() => setShowExerciseRunner(true)}
+                          className="flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-bold text-white transition-all"
+                          style={{ background: '#6366f1' }}
+                        >
+                          <AcademicCapIcon className="w-4 h-4" />
+                          {t3('Zacznij ćwiczenia', 'Inizia gli esercizi', 'Start exercises', 'Commencer les exercices', 'Empezar ejercicios', 'Übungen starten')}
+                        </button>
+                        <button
+                          onClick={handleGenerateExercises}
+                          disabled={generatingExercises}
+                          className="flex items-center gap-2 px-4 py-3 rounded-xl text-sm font-medium border transition-all disabled:opacity-50"
+                          style={{ border: '1px solid rgba(99,102,241,.3)', color: '#6366f1', background: 'rgba(99,102,241,.05)' }}
+                        >
+                          {generatingExercises
+                            ? <SparklesIcon className="w-4 h-4 animate-spin" />
+                            : <SparklesIcon className="w-4 h-4" />}
+                          {generatingExercises
+                            ? t3('Generuję nowe…', 'Generando nuovi…', 'Generating new…', 'Génération…', 'Generando…', 'Generiere…')
+                            : t3('Regeneruj (nowe 20)', 'Rigenera (nuovi 20)', 'Regenerate (new 20)', 'Régénérer (20 nouveaux)', 'Regenerar (nuevos 20)', 'Neu generieren (20)')}
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center gap-4 text-center py-4">
+                      <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-3xl"
+                        style={{ background: 'rgba(99,102,241,.1)' }}>🎓</div>
+                      <div className="max-w-sm">
+                        <p className="font-bold text-base mb-1" style={{ color: 'var(--c-text)' }}>
+                          {t3('Brak ćwiczeń', 'Nessun esercizio', 'No exercises yet', 'Aucun exercice', 'Sin ejercicios', 'Keine Übungen')}
+                        </p>
+                        <p className="text-sm leading-relaxed" style={{ color: 'var(--c-muted)' }}>
+                          {t3(
+                            'Wygeneruj do 20 zróżnicowanych ćwiczeń opartych na tej lekcji. Ćwiczenia zostaną zapisane i będą dostępne w zakładce Ćwiczenia.',
+                            'Genera fino a 20 esercizi variegati basati su questa lezione.',
+                            'Generate up to 20 diverse exercises based on this lesson. Exercises are saved and accessible from the Exercises view.',
+                            'Générez jusqu\'à 20 exercices variés basés sur cette leçon.',
+                            'Genera hasta 20 ejercicios variados basados en esta lección.',
+                            'Generiere bis zu 20 abwechslungsreiche Übungen zu dieser Lektion.'
+                          )}
+                        </p>
+                      </div>
+                      <button
+                        onClick={handleGenerateExercises}
+                        disabled={generatingExercises}
+                        className="flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-bold text-white transition-all disabled:opacity-50"
+                        style={{ background: '#6366f1' }}
+                      >
+                        {generatingExercises
+                          ? <SparklesIcon className="w-4 h-4 animate-spin" />
+                          : <SparklesIcon className="w-4 h-4" />}
+                        {generatingExercises
+                          ? t3('Generuję ćwiczenia AI…', 'Sto generando…', 'Generating exercises…', 'Génération en cours…', 'Generando ejercicios…', 'Generiere Übungen…')
+                          : t3('Generuj 20 ćwiczeń AI', 'Genera 20 esercizi', 'Generate 20 exercises', 'Générer 20 exercices', 'Generar 20 ejercicios', '20 Übungen generieren')}
+                      </button>
+                      {exerciseGenError && (
+                        <p className="text-sm" style={{ color: 'var(--c-red)' }}>{exerciseGenError}</p>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
             </section>
 
