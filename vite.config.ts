@@ -9,6 +9,8 @@ const HISTORY_DIR = path.resolve(__dirname, 'history');
 const JOBS_DIR = path.resolve(__dirname, 'history', 'jobs');
 // Katalog z zestawami ćwiczeń
 const EXERCISES_DIR = path.resolve(__dirname, 'history', 'exercises');
+// Plik konfiguracyjny serwera (klucz API, wybrany model)
+const CONFIG_FILE = path.resolve(__dirname, 'history', '.config.json');
 
 function ensureHistoryDir() {
   if (!fs.existsSync(HISTORY_DIR)) fs.mkdirSync(HISTORY_DIR, { recursive: true });
@@ -19,6 +21,35 @@ function ensureJobsDir() {
 function ensureExercisesDir() {
   if (!fs.existsSync(EXERCISES_DIR)) fs.mkdirSync(EXERCISES_DIR, { recursive: true });
 }
+
+// ─── Server-side config (API key, model) ──────────────────────────────────────
+
+interface ServerConfig {
+  apiKey?: string;
+  model?: string;
+}
+
+function readConfig(): ServerConfig {
+  try {
+    if (!fs.existsSync(CONFIG_FILE)) return {};
+    return JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf-8'));
+  } catch { return {}; }
+}
+
+function writeConfig(patch: Partial<ServerConfig>): void {
+  ensureHistoryDir();
+  const current = readConfig();
+  fs.writeFileSync(CONFIG_FILE, JSON.stringify({ ...current, ...patch }), 'utf-8');
+}
+
+// ─── In-memory models cache ────────────────────────────────────────────────────
+
+interface ModelsCache {
+  data: unknown[];
+  fetchedAt: number;
+}
+let modelsCache: ModelsCache | null = null;
+const MODELS_CACHE_TTL = 10 * 60 * 1000; // 10 minut
 
 // ─── Server-side job types ────────────────────────────────────────────────────
 
@@ -247,8 +278,11 @@ function historyApiPlugin() {
           req.on('data', (c: any) => { body += c; });
           req.on('end', () => {
             try {
-              const { topic, targetLang, model, apiKey, imageData } = JSON.parse(body);
-              if (!targetLang || !apiKey) {
+              const { topic, targetLang, model, apiKey: bodyApiKey, imageData } = JSON.parse(body);
+              // Klucz API: z body (backward compat) lub z konfiguracji serwera
+              const cfg = readConfig();
+              const resolvedApiKey = bodyApiKey || cfg.apiKey;
+              if (!targetLang || !resolvedApiKey) {
                 res.statusCode = 400;
                 res.end(JSON.stringify({ error: 'Missing required fields: targetLang, apiKey' }));
                 return;
@@ -259,12 +293,13 @@ function historyApiPlugin() {
                 res.end(JSON.stringify({ error: 'Missing required field: topic or imageData' }));
                 return;
               }
+              const resolvedModel = model || cfg.model || 'google/gemini-2.5-pro-preview-03-25';
               const job: ServerJob = {
                 id: genJobId(),
                 topic: String(topic || ''),
                 targetLang: targetLang as 'it' | 'en' | 'fr' | 'es' | 'de' | 'cs' | 'ru' | 'pt' | 'el',
-                model: String(model || 'google/gemini-3-pro-preview'),
-                apiKey: String(apiKey),
+                model: String(resolvedModel),
+                apiKey: String(resolvedApiKey),
                 ...(imageData ? { imageData: String(imageData) } : {}),
                 status: 'pending',
                 createdAt: Date.now(),
@@ -393,6 +428,143 @@ function historyApiPlugin() {
         }
 
         next();
+      });
+
+      // ── GET /api/config + POST /api/config ──────────────────────────────────
+      server.middlewares.use('/api/config', (req: any, res: any, next: any) => {
+        if (req.url !== '/' && req.url !== '') { next(); return; }
+        res.setHeader('Content-Type', 'application/json');
+
+        if (req.method === 'GET') {
+          const cfg = readConfig();
+          // Nigdy nie zwracaj klucza API — tylko czy jest ustawiony
+          res.end(JSON.stringify({ hasKey: !!cfg.apiKey, model: cfg.model ?? '' }));
+          return;
+        }
+
+        if (req.method === 'POST') {
+          let body = '';
+          req.on('data', (c: any) => { body += c; });
+          req.on('end', () => {
+            try {
+              const { apiKey, model } = JSON.parse(body);
+              const patch: Partial<ServerConfig> = {};
+              if (typeof apiKey === 'string' && apiKey.trim()) patch.apiKey = apiKey.trim();
+              if (typeof model === 'string' && model.trim()) patch.model = model.trim();
+              writeConfig(patch);
+              res.end('{"ok":true}');
+            } catch {
+              res.statusCode = 400;
+              res.end('{"ok":false}');
+            }
+          });
+          return;
+        }
+
+        res.statusCode = 405;
+        res.end('{"ok":false}');
+      });
+
+      // ── GET /api/models (z cache'em) ─────────────────────────────────────────
+      server.middlewares.use('/api/models', async (req: any, res: any, next: any) => {
+        if (req.url !== '/' && req.url !== '') { next(); return; }
+        if (req.method !== 'GET') { next(); return; }
+        res.setHeader('Content-Type', 'application/json');
+
+        const now = Date.now();
+        if (modelsCache && now - modelsCache.fetchedAt < MODELS_CACHE_TTL) {
+          res.end(JSON.stringify(modelsCache.data));
+          return;
+        }
+
+        try {
+          const cfg = readConfig();
+          if (!cfg.apiKey) {
+            res.statusCode = 401;
+            res.end(JSON.stringify({ error: 'API key not configured' }));
+            return;
+          }
+          const mod = await server.ssrLoadModule('/services/geminiService.ts');
+          const list = await mod.loadModels(cfg.apiKey);
+          modelsCache = { data: list, fetchedAt: Date.now() };
+          res.end(JSON.stringify(list));
+        } catch (err: any) {
+          console.error('[models] Error fetching models:', err?.message);
+          res.statusCode = 500;
+          res.end(JSON.stringify({ error: err?.message ?? 'Failed to load models' }));
+        }
+      });
+
+      // ── POST /api/correct (korekcja tekstu przez serwer) ─────────────────────
+      server.middlewares.use('/api/correct', async (req: any, res: any, next: any) => {
+        if (req.url !== '/' && req.url !== '') { next(); return; }
+        if (req.method !== 'POST') { next(); return; }
+        res.setHeader('Content-Type', 'application/json');
+
+        let body = '';
+        req.on('data', (c: any) => { body += c; });
+        req.on('end', async () => {
+          try {
+            const { text, lang, mode } = JSON.parse(body);
+            if (!text || !lang || !mode) {
+              res.statusCode = 400;
+              res.end(JSON.stringify({ error: 'Missing fields: text, lang, mode' }));
+              return;
+            }
+            const cfg = readConfig();
+            if (!cfg.apiKey) {
+              res.statusCode = 401;
+              res.end(JSON.stringify({ error: 'API key not configured' }));
+              return;
+            }
+            const mod = await server.ssrLoadModule('/services/geminiService.ts');
+            const result = await mod.correctText(text, lang, mode, cfg.apiKey, cfg.model ?? '');
+            res.end(JSON.stringify(result));
+          } catch (err: any) {
+            console.error('[correct] Error:', err?.message);
+            res.statusCode = 500;
+            res.end(JSON.stringify({ error: err?.message ?? 'Correction failed' }));
+          }
+        });
+      });
+
+      // ── POST /api/generate-exercises (generowanie ćwiczeń przez serwer) ─────
+      server.middlewares.use('/api/generate-exercises', async (req: any, res: any, next: any) => {
+        if (req.url !== '/' && req.url !== '') { next(); return; }
+        if (req.method !== 'POST') { next(); return; }
+        res.setHeader('Content-Type', 'application/json');
+
+        let body = '';
+        req.on('data', (c: any) => { body += c; });
+        req.on('end', async () => {
+          try {
+            const { lesson, count, existingExerciseIds } = JSON.parse(body);
+            if (!lesson) {
+              res.statusCode = 400;
+              res.end(JSON.stringify({ error: 'Missing field: lesson' }));
+              return;
+            }
+            const cfg = readConfig();
+            if (!cfg.apiKey) {
+              res.statusCode = 401;
+              res.end(JSON.stringify({ error: 'API key not configured' }));
+              return;
+            }
+            const mod = await server.ssrLoadModule('/services/exerciseService.ts');
+            const exerciseSet = await mod.generateExercisesServer(
+              lesson,
+              cfg.apiKey,
+              cfg.model ?? '',
+              count ?? 20,
+              existingExerciseIds ?? []
+            );
+            res.end(JSON.stringify(exerciseSet));
+          } catch (err: any) {
+            console.error('[exercises] Error:', err?.message);
+            res.statusCode = 500;
+            res.end(JSON.stringify({ error: err?.message ?? 'Exercise generation failed' }));
+          }
+        });
       });
     },
   };

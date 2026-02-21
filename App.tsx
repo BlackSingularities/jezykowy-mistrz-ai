@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, FormEvent, useCallback } from 'react';
 import { createRoot } from 'react-dom/client';
-import { loadModels, getSavedModel, saveModel, ORModel, generateSpanishLesson, generateCzechLesson, generateRussianLesson, generatePortugueseLesson, generateGreekLesson } from './services/geminiService';
+import { getSavedModel, saveModel, ORModel } from './services/geminiService';
 import { LessonView, getFavorites, toggleFavorite } from './components/LessonView';
 import { ExercisesView } from './components/ExercisesView';
 import { TextCorrectionView } from './components/TextCorrectionView';
@@ -114,11 +114,10 @@ const DIFF_LABELS: Record<string, { pl: string; it: string; en: string; fr: stri
 // ─── ModelPicker ──────────────────────────────────────────────────────────────
 
 const ModelPicker: React.FC<{
-  apiKey: string;
   activeModel: string;
   onChange: (modelId: string) => void;
   lang: 'it' | 'pl' | 'en' | 'fr' | 'es' | 'de' | 'cs' | 'ru' | 'pt' | 'el';
-}> = ({ apiKey, activeModel, onChange, lang }) => {
+}> = ({ activeModel, onChange, lang }) => {
   const [open, setOpen] = useState(false);
   const [models, setModels] = useState<ORModel[]>([]);
   const [loading, setLoading] = useState(false);
@@ -142,7 +141,9 @@ const ModelPicker: React.FC<{
     setLoading(true);
     setError('');
     try {
-      const list = await loadModels(apiKey);
+      const res = await fetch('/api/models');
+      if (!res.ok) throw new Error('Server error');
+      const list: ORModel[] = await res.json();
       // sortuj: darmowe/popularne najpierw (po nazwie)
       setModels(list.sort((a, b) => a.id.localeCompare(b.id)));
     } catch {
@@ -510,11 +511,10 @@ const ChangeKeyModal: React.FC<{ onClose: () => void; onSave: (key: string) => v
 const DIFF_LEVELS = ['A1', 'A2', 'B1', 'B2', 'C1'] as const;
 
 const AppInner: React.FC<{
-  apiKey: string;
   onChangeKey: () => void;
   onBackToHome: () => void;
   onChangeLang: (lang: TargetLang) => void;
-}> = ({ apiKey, onChangeKey, onBackToHome, onChangeLang }) => {
+}> = ({ onChangeKey, onBackToHome, onChangeLang }) => {
   const { globalLang, toggleGlobal, targetLang } = useLang();
   const { theme, toggleTheme } = useTheme();
   const { fontSizeIndex, increaseFontSize, decreaseFontSize } = useFontSize();
@@ -680,7 +680,6 @@ const AppInner: React.FC<{
             topic,
             targetLang,
             model: activeModel,
-            apiKey,
             ...(capturedImage && i === 0 ? { imageData: capturedImage } : {}),
           }),
         })
@@ -768,6 +767,12 @@ const AppInner: React.FC<{
   const handleModelChange = (modelId: string) => {
     setActiveModel(modelId);
     saveModel(modelId);
+    // Synchronizuj wybrany model z konfiguracją serwera
+    fetch('/api/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: modelId }),
+    }).catch(() => {}); // fire-and-forget
   };
 
   // ── Open a completed queue lesson (may be in a different language) ──────────
@@ -908,7 +913,6 @@ const AppInner: React.FC<{
           </div>
           <div className="flex items-center gap-1 ml-auto">
             <ModelPicker
-              apiKey={apiKey}
               activeModel={activeModel}
               onChange={handleModelChange}
               lang={l}
@@ -1586,16 +1590,58 @@ const HomeScreen: React.FC<{ onSelect: (lang: TargetLang) => void }> = ({ onSele
 // ─── Root App ─────────────────────────────────────────────────────────────────
 
 const App: React.FC = () => {
-  const [apiKey, setApiKey] = useState<string>(() => localStorage.getItem(API_KEY_STORAGE) || '');
+  // Trzy stany: null = ładowanie, false = brak klucza, true = klucz ustawiony
+  const [hasKey, setHasKey] = useState<boolean | null>(null);
   const [showKeyModal, setShowKeyModal] = useState(false);
   const [targetLang, setTargetLang] = useState<TargetLang | null>(() => {
     const saved = localStorage.getItem(APP_MODE_KEY) as TargetLang | null;
     return saved === 'it' || saved === 'en' || saved === 'fr' || saved === 'es' || saved === 'de' || saved === 'cs' || saved === 'ru' || saved === 'pt' || saved === 'el' ? saved : null;
   });
 
-  const saveApiKey = (key: string) => {
+  // Przy starcie: sprawdź konfigurację serwera (klucz API, model)
+  useEffect(() => {
+    fetch('/api/config')
+      .then(r => r.json())
+      .then(({ hasKey: serverHasKey, model }: { hasKey: boolean; model: string }) => {
+        if (serverHasKey) {
+          setHasKey(true);
+          // Synchronizuj model z serwera do localStorage jeśli nie jest ustawiony lokalnie
+          if (model && !getSavedModel()) saveModel(model);
+        } else {
+          // Nie ma klucza na serwerze — sprawdź localStorage i spróbuj migrować
+          const localKey = localStorage.getItem(API_KEY_STORAGE);
+          if (localKey) {
+            // Przenieś klucz z localStorage na serwer
+            fetch('/api/config', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ apiKey: localKey, model: getSavedModel() || '' }),
+            })
+              .then(() => setHasKey(true))
+              .catch(() => setHasKey(true)); // lokalny klucz nadal istnieje
+          } else {
+            setHasKey(false);
+          }
+        }
+      })
+      .catch(() => {
+        // Serwer niedostępny — użyj localStorage jako fallback
+        setHasKey(!!localStorage.getItem(API_KEY_STORAGE));
+      });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const saveApiKey = async (key: string) => {
+    // Zapisz na serwerze (source of truth)
+    try {
+      await fetch('/api/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ apiKey: key, model: getSavedModel() || '' }),
+      });
+    } catch { /* ignore — fallback poniżej */ }
+    // Zachowaj w localStorage jako fallback
     localStorage.setItem(API_KEY_STORAGE, key);
-    setApiKey(key);
+    setHasKey(true);
   };
 
   const selectLang = (lang: TargetLang) => {
@@ -1608,7 +1654,10 @@ const App: React.FC = () => {
     localStorage.removeItem(APP_MODE_KEY);
   };
 
-  if (!apiKey) return <ApiKeySetup onSave={saveApiKey} />;
+  // Ładowanie — czekamy na odpowiedź serwera
+  if (hasKey === null) return null;
+
+  if (!hasKey) return <ApiKeySetup onSave={saveApiKey} />;
 
   if (!targetLang) {
     return (
@@ -1623,7 +1672,7 @@ const App: React.FC = () => {
       {showKeyModal && (
         <ChangeKeyModal onClose={() => setShowKeyModal(false)} onSave={saveApiKey} />
       )}
-      <AppInner apiKey={apiKey} onChangeKey={() => setShowKeyModal(true)} onBackToHome={goHome} onChangeLang={selectLang} />
+      <AppInner onChangeKey={() => setShowKeyModal(true)} onBackToHome={goHome} onChangeLang={selectLang} />
     </LangProvider>
   );
 };

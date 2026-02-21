@@ -1,9 +1,8 @@
 import OpenAI from "openai";
 import { Lesson, Exercise, ExerciseSet, TargetLang } from "../types";
-import { getSavedModel } from "./geminiService";
 
-const DEFAULT_MODEL = "google/gemini-2.5-pro-preview-03-25";
 const MAX_EXERCISES = 20;
+const DEFAULT_MODEL = "google/gemini-2.5-pro-preview-03-25";
 
 /** Build a distribution string for the given count */
 function buildDistributionPrompt(count: number, langNamePl: string, tl: string): string {
@@ -185,9 +184,13 @@ function isValidExercise(ex: unknown): ex is Exercise {
   }
 }
 
-// ─── Main generation function ─────────────────────────────────────────────────
+// ─── Server-side generation (wywoływana przez vite.config.ts przez SSR) ────────
 
-export async function generateExercises(
+/**
+ * Bezpośrednie generowanie ćwiczeń przez OpenAI/OpenRouter.
+ * Używana wyłącznie po stronie serwera (via Vite SSR).
+ */
+export async function generateExercisesServer(
   lesson: Lesson,
   apiKey: string,
   model?: string,
@@ -202,19 +205,11 @@ export async function generateExercises(
 
   const tl = lesson.targetLang || "it";
   const lessonSummary = buildLessonSummary(lesson);
-  const resolvedModel = model || getSavedModel() || DEFAULT_MODEL;
+  const resolvedModel = model || DEFAULT_MODEL;
 
-  // Language labels for the prompt
   const langLabel: Record<string, string> = {
-    it: "włoski",
-    en: "angielski",
-    fr: "francuski",
-    es: "hiszpański",
-    de: "niemiecki",
-    cs: "czeski",
-    ru: "rosyjski",
-    pt: "portugalski",
-    el: "grecki",
+    it: "włoski", en: "angielski", fr: "francuski", es: "hiszpański",
+    de: "niemiecki", cs: "czeski", ru: "rosyjski", pt: "portugalski", el: "grecki",
   };
   const langNamePl = langLabel[tl] ?? tl;
 
@@ -230,150 +225,19 @@ export async function generateExercises(
 ${lessonSummary}
 
 === WYMAGANIA ===
-
 Język docelowy lekcji: ${langNamePl} (${tl})
 Stwórz dokładnie ${actualCount} ćwiczeń (numeruj ID od ex_${startId} do ex_${startId + actualCount - 1}).
-
 ${buildDistributionPrompt(actualCount, langNamePl, tl)}
-
-Ćwiczenia muszą być:
-- Bardzo zróżnicowane pod względem formatu i treści
-- Oparty na materiale z lekcji (słownictwo, gramatyka, zwroty, dialog)
-- Stopniowane trudnością (easy → medium → hard)
-- Pedagogicznie wartościowe: każde ćwiczenie ucząc czegoś konkretnego
+Ćwiczenia muszą być: bardzo zróżnicowane, oparte na materiale z lekcji, stopniowane trudnością (easy→hard).
 
 === FORMAT JSON ===
-
-Odpowiedz WYŁĄCZNIE obiektem JSON w formie: {"exercises": [...]}
-Każde ćwiczenie ma pola bazowe + pola specyficzne dla typu.
-
-POLA BAZOWE (wymagane dla każdego ćwiczenia):
-{
-  "id": "ex_${startId}",    // ex_${startId} do ex_${startId + actualCount - 1}
-  "type": "...",            // jeden z typów powyżej
-  "difficulty": "easy|medium|hard",
-  "focus": "...",           // co to ćwiczenie sprawdza, np. "słownictwo – jedzenie", "gramatyka – passato prossimo"
-  "instruction_pl": "...",  // krótka instrukcja po polsku
-  "instruction_tl": "...",  // ta sama instrukcja w języku ${langNamePl}
-  "explanation_pl": "...",  // wyjaśnienie poprawnej odpowiedzi po polsku (2-3 zdania)
-  "explanation_tl": "..."   // to samo wyjaśnienie w języku ${langNamePl}
-}
-
-POLA SPECYFICZNE DLA KAŻDEGO TYPU:
-
-multiple_choice:
-{
-  "question": "...",        // pytanie w ${langNamePl} LUB polskim
-  "question_pl": "...",     // jeśli pytanie jest po ${langNamePl}, dodaj polskie tłumaczenie
-  "options": ["A", "B", "C", "D"],  // 4 opcje (TYLKO tekst, bez liter A/B/C/D)
-  "correct_index": 0        // indeks poprawnej odpowiedzi (0-3)
-}
-
-fill_blank:
-{
-  "sentence": "Io ___ (mangiare) la pizza ogni giorno.",  // ___ to puste miejsce
-  "correct": "mangio",      // słowo które pasuje w lukę
-  "hint": "czasownik 'mangiare', 1. osoba l.poj., presente indicativo"
-}
-
-translation_tl_pl:
-{
-  "source": "zdanie w ${langNamePl}",
-  "correct": "polskie tłumaczenie",
-  "acceptable": ["inne poprawne tłumaczenie", "jeszcze jedno"]  // opcjonalne
-}
-
-translation_pl_tl:
-{
-  "source": "polskie zdanie",
-  "correct": "tłumaczenie w ${langNamePl}",
-  "acceptable": ["inna poprawna wersja"]  // opcjonalne
-}
-
-matching:
-{
-  "pairs": [
-    {"id": "p1", "left": "słowo w ${langNamePl}", "right": "polskie znaczenie"},
-    {"id": "p2", "left": "...", "right": "..."},
-    {"id": "p3", "left": "...", "right": "..."},
-    {"id": "p4", "left": "...", "right": "..."},
-    {"id": "p5", "left": "...", "right": "..."}
-  ]
-}
-
-word_order:
-{
-  "words": ["słowo1", "słowo2", "słowo3", "słowo4", "słowo5"],  // POMIESZANE słowa
-  "correct": "Słowo1 słowo2 słowo3 słowo4 słowo5.",  // poprawne zdanie
-  "translation_hint": "polskie tłumaczenie zdania"
-}
-
-true_false:
-{
-  "statement": "zdanie w ${langNamePl}",
-  "statement_pl": "polskie tłumaczenie (opcjonalne)",
-  "is_true": true,
-  "correction": "poprawna wersja jeśli zdanie jest fałszywe"  // tylko gdy is_true=false
-}
-
-error_correction:
-{
-  "incorrect_sentence": "zdanie z błędem w ${langNamePl}",
-  "correct_sentence": "poprawna wersja",
-  "error_type": "opis błędu po polsku"
-}
-
-conjugation:
-{
-  "verb": "bezokolicznik",
-  "tense": "nazwa czasu po polsku",
-  "pronoun": "zaimek w ${langNamePl}, np. io",
-  "pronoun_pl": "zaimek po polsku, np. ja",
-  "correct": "poprawna forma"
-}
-
-gap_fill_wordbank:
-{
-  "text": "Zdanie z _1_ i kolejną _2_ luką.",  // _1_, _2_ itd. jako markery luk
-  "word_bank": ["słowo1", "słowo2", "słowo3", "słowo4", "słowo5"],  // zawiera poprawne + rozpraszające
-  "correct_answers": ["słowo_do_luki_1", "słowo_do_luki_2"]  // po kolei
-}
-
-dialogue_completion:
-{
-  "context_pl": "opis sytuacji dialogu po polsku",
-  "dialogue": [
-    {"speaker": "Osoba A", "text": "zdanie"},
-    {"speaker": "Osoba B", "text": "___", "is_blank": true},
-    {"speaker": "Osoba A", "text": "odpowiedź"}
-  ],
-  "options": ["opcja A", "opcja B", "opcja C", "opcja D"],
-  "correct_index": 0
-}
-
-definition_match:
-{
-  "definition": "definicja słowa w ${langNamePl}",
-  "definition_pl": "definicja po polsku (opcjonalne)",
-  "options": ["słowo1", "słowo2", "słowo3", "słowo4"],
-  "correct_index": 0
-}
-
-=== WAŻNE ===
-- Zwróć obiekt: {"exercises": [...array of ${actualCount} exercises...]}
-- Każde id unikalne: ex_${startId}, ex_${startId + 1}, ..., ex_${startId + actualCount - 1}
-- Wszystkie polskie instrukcje płynne i poprawne językowo
-- Sprawdź poprawność merytoryczną każdego ćwiczenia
-- Ćwiczenia muszą bazować na materiale z lekcji, nie być wymyślone z powietrza`;
+Odpowiedz WYŁĄCZNIE: {"exercises": [...]}
+Każde ćwiczenie: id (ex_${startId}..ex_${startId + actualCount - 1}), type, difficulty (easy|medium|hard), focus, instruction_pl, instruction_tl, explanation_pl, explanation_tl + pola specyficzne dla typu.`;
 
   const response = await client.chat.completions.create({
     model: resolvedModel,
     messages: [
-      {
-        role: "system",
-        content:
-          'Jesteś ekspertem tworzenia ćwiczeń językowych. Odpowiadasz WYŁĄCZNIE obiektem JSON w postaci {"exercises": [...]} bez żadnych komentarzy, markdown ani code fences.',
-      },
+      { role: "system", content: 'Jesteś ekspertem tworzenia ćwiczeń językowych. Odpowiadasz WYŁĄCZNIE obiektem JSON w postaci {"exercises": [...]} bez żadnych komentarzy, markdown ani code fences.' },
       { role: "user", content: prompt },
     ],
     response_format: { type: "json_object" },
@@ -381,22 +245,17 @@ definition_match:
   });
 
   const rawContent = response.choices[0]?.message?.content ?? "[]";
-
-  // The model may return a JSON object with an array field instead of a raw array
-  // Handle both cases
   let parsed = tryParseJSON(rawContent);
   let exercisesRaw: unknown[] = [];
 
   if (Array.isArray(parsed)) {
     exercisesRaw = parsed;
   } else if (parsed && typeof parsed === "object") {
-    // Find the first array value
     const vals = Object.values(parsed as Record<string, unknown>);
     const arr = vals.find(Array.isArray);
     if (arr) exercisesRaw = arr as unknown[];
   }
 
-  // Filter to valid exercises only
   const exercises = exercisesRaw
     .filter(isValidExercise)
     .slice(0, actualCount) as Exercise[];
@@ -407,21 +266,41 @@ definition_match:
 
   const topicTl = (lesson.topic as Record<string, string>)[tl] ?? lesson.topic.pl;
 
-  const exerciseSet: ExerciseSet = {
+  return {
     lessonId: lesson.id,
     lessonEmoji: lesson.emoji,
-    lessonTopic: {
-      pl: lesson.topic.pl,
-      [tl]: topicTl,
-    } as import("../types").Bilingual,
+    lessonTopic: { pl: lesson.topic.pl, [tl]: topicTl } as import("../types").Bilingual,
     lessonSubtitle: lesson.subtitle,
     targetLang: tl as TargetLang,
     difficulty_level: lesson.difficulty_level,
     generatedAt: Date.now(),
     exercises,
   };
+}
 
-  return exerciseSet;
+// ─── Client-side generation function ─────────────────────────────────────────
+
+/**
+ * Generuje ćwiczenia przez serwer (POST /api/generate-exercises).
+ * Klucz API i model są zarządzane po stronie serwera.
+ */
+export async function generateExercises(
+  lesson: Lesson,
+  _apiKey?: string, // deprecated — serwer używa własnego klucza
+  _model?: string,  // deprecated — serwer używa własnego modelu
+  count: number = MAX_EXERCISES,
+  existingExerciseIds: string[] = []
+): Promise<ExerciseSet> {
+  const res = await fetch('/api/generate-exercises', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ lesson, count, existingExerciseIds }),
+  });
+  if (!res.ok) {
+    const errBody = await res.json().catch(() => ({}));
+    throw new Error(errBody?.error || `Błąd serwera (${res.status})`);
+  }
+  return res.json() as Promise<ExerciseSet>;
 }
 
 // ─── Append more exercises to existing set ────────────────────────────────────
@@ -434,11 +313,11 @@ export async function appendExercises(
   lesson: Lesson,
   existingSet: ExerciseSet,
   count: number,
-  apiKey: string,
-  model?: string
+  _apiKey?: string, // deprecated
+  _model?: string   // deprecated
 ): Promise<ExerciseSet> {
   const existingIds = existingSet.exercises.map(e => e.id);
-  const newSet = await generateExercises(lesson, apiKey, model, count, existingIds);
+  const newSet = await generateExercises(lesson, undefined, undefined, count, existingIds);
 
   return {
     ...existingSet,
