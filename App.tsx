@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, FormEvent } from 'react';
 import { createRoot } from 'react-dom/client';
 import { loadModels, getSavedModel, saveModel, ORModel, generateSpanishLesson, generateCzechLesson, generateRussianLesson, generatePortugueseLesson, generateGreekLesson } from './services/geminiService';
 import { LessonView, getFavorites, toggleFavorite } from './components/LessonView';
+import { ExercisesView } from './components/ExercisesView';
 import { LangProvider, useLang, useTheme, useFontSize } from './context/LangContext';
 import { Flag, LangFlag } from './components/Flag';
 import { Lesson, TargetLang } from './types';
@@ -19,6 +20,7 @@ import {
   StarIcon,
   CheckCircleIcon,
   ExclamationCircleIcon,
+  AcademicCapIcon,
 } from '@heroicons/react/24/solid';
 import { LanguageIcon, SunIcon, MoonIcon, ArrowPathIcon, StarIcon as StarOutlineIcon, ArrowLeftIcon } from '@heroicons/react/24/outline';
 
@@ -526,6 +528,7 @@ const AppInner: React.FC<{
   const [history, setHistory] = useState<Lesson[]>([]);
   const [historyLoaded, setHistoryLoaded] = useState(false);
   const [activeLesson, setActiveLesson] = useState<Lesson | null>(null);
+  const [showExercisesView, setShowExercisesView] = useState(false);
   const [queue, setQueue] = useState<QueueItem[]>([]);
   const [search, setSearch] = useState('');
   const [activeModel, setActiveModel] = useState<string>(() => getSavedModel());
@@ -774,6 +777,22 @@ const AppInner: React.FC<{
   const totalPages = Math.ceil(filteredHistory.length / ITEMS_PER_PAGE);
   const pagedHistory = filteredHistory.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
 
+  if (showExercisesView) {
+    return (
+      <ExercisesView
+        targetLang={targetLang}
+        onBack={() => setShowExercisesView(false)}
+        onOpenLesson={(lessonId) => {
+          const lesson = history.find(l => l.id === lessonId);
+          if (lesson) {
+            setShowExercisesView(false);
+            setActiveLesson(lesson);
+          }
+        }}
+      />
+    );
+  }
+
   if (activeLesson) {
     return (
       <LessonView
@@ -874,6 +893,18 @@ const AppInner: React.FC<{
                 ? <SunIcon className="w-4 h-4 theme-icon-enter" />
                 : <MoonIcon className="w-4 h-4 theme-icon-enter" />
               }
+            </button>
+            {/* Ćwiczenia */}
+            <button
+              onClick={() => setShowExercisesView(true)}
+              title={l === 'pl' ? 'Moje ćwiczenia' : l === 'en' ? 'My exercises' : l === 'fr' ? 'Mes exercices' : l === 'es' ? 'Mis ejercicios' : l === 'de' ? 'Meine Übungen' : 'I miei esercizi'}
+              className="nav-icon-btn hidden sm:flex"
+              style={{ width: 'auto', padding: '0 10px', gap: 4 }}
+            >
+              <AcademicCapIcon className="w-3.5 h-3.5" />
+              <span className="text-xs font-medium">
+                {l === 'pl' ? 'Ćwiczenia' : l === 'en' ? 'Exercises' : l === 'fr' ? 'Exercices' : l === 'es' ? 'Ejercicios' : l === 'de' ? 'Übungen' : 'Esercizi'}
+              </span>
             </button>
             {/* Klucz API */}
             <button
