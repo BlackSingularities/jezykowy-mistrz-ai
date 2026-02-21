@@ -1594,6 +1594,12 @@ const HomeScreen: React.FC<{
 }> = ({ onSelect, onTextCorrect, onChangeKey }) => {
   const { theme, toggleTheme } = useTheme();
   const [showSettings, setShowSettings] = useState(false);
+  const [activeModel, setActiveModel] = useState<string>(() => getSavedModel());
+
+  const handleModelChange = (modelId: string) => {
+    setActiveModel(modelId);
+    saveModel(modelId);
+  };
 
   return (
     <div className="min-h-screen flex flex-col" style={{ background: 'var(--c-bg)', color: 'var(--c-text)' }}>
@@ -1739,6 +1745,8 @@ const HomeScreen: React.FC<{
         onClose={() => setShowSettings(false)}
         onChangeKey={onChangeKey}
         lang="pl"
+        activeModel={activeModel}
+        onModelChange={handleModelChange}
       />
     </div>
   );
