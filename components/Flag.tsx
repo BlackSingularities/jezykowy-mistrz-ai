@@ -5,7 +5,7 @@ import React from 'react';
 // Polish flag:  white / red (2 horizontal stripes)
 
 interface FlagProps {
-  code: 'it' | 'pl' | 'en' | 'fr' | 'es' | 'de' | 'cs' | 'ru';
+  code: 'it' | 'pl' | 'en' | 'fr' | 'es' | 'de' | 'cs' | 'ru' | 'pt';
   /** Height in px; width is auto (1.5× for IT, same for PL) */
   size?: number;
   className?: string;
@@ -21,7 +21,7 @@ export const Flag: React.FC<FlagProps> = ({
   'aria-hidden': ariaHidden,
 }) => {
   const hidden = ariaHidden === true || ariaHidden === 'true';
-  const label = hidden ? undefined : (ariaLabel ?? (code === 'it' ? 'Flaga Włoch' : code === 'en' ? 'Flaga Wielkiej Brytanii' : code === 'fr' ? 'Flaga Francji' : code === 'es' ? 'Flaga Hiszpanii' : code === 'de' ? 'Flaga Niemiec' : code === 'cs' ? 'Flaga Czech' : code === 'ru' ? 'Flaga Rosji' : 'Flaga Polski'));
+  const label = hidden ? undefined : (ariaLabel ?? (code === 'it' ? 'Flaga Włoch' : code === 'en' ? 'Flaga Wielkiej Brytanii' : code === 'fr' ? 'Flaga Francji' : code === 'es' ? 'Flaga Hiszpanii' : code === 'de' ? 'Flaga Niemiec' : code === 'cs' ? 'Flaga Czech' : code === 'ru' ? 'Flaga Rosji' : code === 'pt' ? 'Flaga Portugalii' : 'Flaga Polski'));
   const w = Math.round(size * 1.5);
   const h = size;
 
@@ -87,6 +87,12 @@ export const Flag: React.FC<FlagProps> = ({
           <rect width="3" height="1" y="1" fill="#0039a6"/>
           <rect width="3" height="1" y="2" fill="#d52b1e"/>
         </svg>
+      ) : code === 'pt' ? (
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 3 2" width={w} height={h} style={{ display: 'block' }}>
+          <rect width="3" height="2" fill="#006600"/>
+          <rect x="1" width="2" height="2" fill="#ff0000"/>
+          <circle cx="1" cy="1" r="0.35" fill="#ffcc00" stroke="#006600" strokeWidth="0.05"/>
+        </svg>
       ) : (
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 8 5" width={w} height={h} style={{ display: 'block' }}>
           <rect width="8" height="5" fill="#ffffff"/>
@@ -100,7 +106,7 @@ export const Flag: React.FC<FlagProps> = ({
 // ─── Convenience: flag that auto-follows current language ─────────────────────
 
 export const LangFlag: React.FC<{
-  lang: 'it' | 'pl' | 'en' | 'fr' | 'es' | 'de' | 'cs' | 'ru';
+  lang: 'it' | 'pl' | 'en' | 'fr' | 'es' | 'de' | 'cs' | 'ru' | 'pt';
   size?: number;
   className?: string;
 }> = ({ lang, size = 16, className }) => (

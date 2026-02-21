@@ -144,12 +144,12 @@ function splitText(text: string): string[] {
   return chunks.length ? chunks : [raw];
 }
 
-const useTTS = (targetLang: 'it' | 'en' | 'fr' | 'es' | 'de' | 'cs' = 'it') => {
+const useTTS = (targetLang: 'it' | 'en' | 'fr' | 'es' | 'de' | 'cs' | 'ru' | 'pt' = 'it') => {
   const [rate, setRate] = useState(0.9);
   const [speakId, setSpeakId] = useState<string | null>(null);
   const voiceRef = React.useRef<SpeechSynthesisVoice | null>(null);
   const [hasItalianVoice, setHasItalianVoice] = useState(false);
-  const ttsLang = targetLang === 'en' ? 'en-GB' : targetLang === 'fr' ? 'fr-FR' : targetLang === 'es' ? 'es-ES' : targetLang === 'de' ? 'de-DE' : targetLang === 'cs' ? 'cs-CZ' : 'it-IT';
+  const ttsLang = targetLang === 'en' ? 'en-GB' : targetLang === 'fr' ? 'fr-FR' : targetLang === 'es' ? 'es-ES' : targetLang === 'de' ? 'de-DE' : targetLang === 'cs' ? 'cs-CZ' : targetLang === 'ru' ? 'ru-RU' : targetLang === 'pt' ? 'pt-PT' : 'it-IT';
 
   useEffect(() => {
     const findVoice = () => {
@@ -183,6 +183,18 @@ const useTTS = (targetLang: 'it' | 'en' | 'fr' | 'es' | 'de' | 'cs' = 'it') => {
           voices.find(v => v.lang === 'cs-CZ' && v.localService) ||
           voices.find(v => v.lang === 'cs-CZ') ||
           voices.find(v => v.lang.startsWith('cs')) ||
+          null;
+      } else if (targetLang === 'ru') {
+        voiceRef.current =
+          voices.find(v => v.lang === 'ru-RU' && v.localService) ||
+          voices.find(v => v.lang === 'ru-RU') ||
+          voices.find(v => v.lang.startsWith('ru')) ||
+          null;
+      } else if (targetLang === 'pt') {
+        voiceRef.current =
+          voices.find(v => v.lang === 'pt-PT' && v.localService) ||
+          voices.find(v => v.lang === 'pt-PT') ||
+          voices.find(v => v.lang.startsWith('pt')) ||
           null;
       } else {
         voiceRef.current =
