@@ -117,24 +117,6 @@ async function processJob(job: ServerJob, server: any): Promise<void> {
     // Use Vite's SSR module loader to transform & execute TypeScript
     const mod = await server.ssrLoadModule('/services/aiService.ts');
 
-    const genFn = job.targetLang === 'en'
-      ? mod.generateEnglishLesson
-      : job.targetLang === 'fr'
-      ? mod.generateFrenchLesson
-      : job.targetLang === 'es'
-      ? mod.generateSpanishLesson
-      : job.targetLang === 'de'
-      ? mod.generateGermanLesson
-      : job.targetLang === 'cs'
-      ? mod.generateCzechLesson
-      : job.targetLang === 'ru'
-      ? mod.generateRussianLesson
-      : job.targetLang === 'pt'
-      ? mod.generatePortugueseLesson
-      : job.targetLang === 'el'
-      ? mod.generateGreekLesson
-      : mod.generateLesson;
-
     // If imageData is present, analyze the image first to derive the topic
     let topicForGeneration = job.topic;
     if (job.imageData) {
@@ -154,7 +136,7 @@ async function processJob(job: ServerJob, server: any): Promise<void> {
       }
     }
 
-    const lesson = await genFn(topicForGeneration, job.apiKey, job.model);
+    const lesson = await mod.generateLesson(topicForGeneration, job.targetLang, job.apiKey, job.model);
 
     // Persist lesson
     ensureHistoryDir();

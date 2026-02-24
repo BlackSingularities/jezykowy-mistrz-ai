@@ -1,6 +1,12 @@
 import React, { useState, useEffect, useRef, ElementType } from 'react';
 import { Bilingual } from '../types';
 import { useLang, Lang } from '../context/LangContext';
+import { LANGUAGE_CONFIGS } from '../services/languages.config';
+import type { TargetLang } from '../types';
+
+const LANG_TOOLTIP: Record<TargetLang, string> = Object.fromEntries(
+  Object.values(LANGUAGE_CONFIGS).map(c => [c.code, c.tooltipTL])
+) as Record<TargetLang, string>;
 
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -60,14 +66,14 @@ export function BilingualBlock<T extends ElementType = 'span'>({
   if (!content) return null;
   const text = localLang === 'pl'
     ? content.pl
-    : (targetLang === 'en' ? content.en : targetLang === 'fr' ? content.fr : targetLang === 'es' ? content.es : targetLang === 'de' ? content.de : targetLang === 'cs' ? content.cs : targetLang === 'ru' ? content.ru : targetLang === 'pt' ? content.pt : targetLang === 'el' ? content.el : content.it) ?? content.pl;
+    : (content[targetLang as keyof typeof content] ?? content.pl);
   const Tag = (as ?? 'span') as ElementType;
 
   const tooltip = noClick
     ? undefined
     : localLang !== 'pl'
       ? 'Kliknij → Polski'
-      : targetLang === 'en' ? 'Click → English' : targetLang === 'fr' ? 'Cliquez → Français' : targetLang === 'es' ? 'Clic → Español' : targetLang === 'de' ? 'Klicken → Deutsch' : targetLang === 'cs' ? 'Klikněte → Česky' : targetLang === 'ru' ? 'Нажмите → Русский' : targetLang === 'pt' ? 'Clique → Português' : targetLang === 'el' ? 'Κλικ → Ελληνικά' : 'Clicca → Italiano';
+      : LANG_TOOLTIP[targetLang] ?? 'Clicca → Italiano';
 
   return (
     <Tag

@@ -1,5 +1,6 @@
 import OpenAI from "openai";
 import { Lesson, Exercise, ExerciseSet, TargetLang } from "../types";
+import { LANG_NAME_PL } from "./languages.config";
 
 const MAX_EXERCISES = 20;
 const DEFAULT_MODEL = "google/gemini-3-pro-preview";
@@ -207,11 +208,7 @@ export async function generateExercisesServer(
   const lessonSummary = buildLessonSummary(lesson);
   const resolvedModel = model || DEFAULT_MODEL;
 
-  const langLabel: Record<string, string> = {
-    it: "włoski", en: "angielski", fr: "francuski", es: "hiszpański",
-    de: "niemiecki", cs: "czeski", ru: "rosyjski", pt: "portugalski", el: "grecki",
-  };
-  const langNamePl = langLabel[tl] ?? tl;
+  const langNamePl = LANG_NAME_PL[tl as TargetLang] ?? tl;
 
   const actualCount = Math.min(Math.max(count, 1), 50);
   const existingNote = existingExerciseIds.length > 0

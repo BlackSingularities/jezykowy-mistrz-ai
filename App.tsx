@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, FormEvent, useCallback } from 'react';
 import { createRoot } from 'react-dom/client';
 import { getSavedModel, saveModel, ORModel } from './services/aiService';
+import { LANGS_LIST, DIFF_LABELS, LANGUAGE_CONFIGS } from './services/languages.config';
 import { LessonView, getFavorites, toggleFavorite } from './components/LessonView';
 import { ExercisesView } from './components/ExercisesView';
 import { TextCorrectionView } from './components/TextCorrectionView';
@@ -103,13 +104,6 @@ const DIFF_GRADIENT: Record<string, string> = {
   C1: 'from-violet-500 to-purple-700',
 };
 
-const DIFF_LABELS: Record<string, { pl: string; it: string; en: string; fr: string; es: string; de: string; cs: string; ru: string; pt: string; el: string }> = {
-  A1: { pl: 'Początkujący',        it: 'Principiante',    en: 'Beginner',           fr: 'Débutant',           es: 'Principiante',    de: 'Anfänger',         cs: 'Začátečník',      ru: 'Начинающий',      pt: 'Iniciante',       el: 'Αρχάριος'         },
-  A2: { pl: 'Elementarny',         it: 'Elementare',      en: 'Elementary',         fr: 'Élémentaire',        es: 'Elemental',       de: 'Grundkenntnisse',  cs: 'Elementární',     ru: 'Элементарный',    pt: 'Elementar',       el: 'Στοιχειώδης'      },
-  B1: { pl: 'Średniozaawansowany', it: 'Intermedio',      en: 'Intermediate',       fr: 'Intermédiaire',      es: 'Intermedio',      de: 'Mittelstufe',      cs: 'Středně pokročilý', ru: 'Средний',       pt: 'Intermédio',      el: 'Μεσαίο επίπεδο'   },
-  B2: { pl: 'Wyższy średni',       it: 'Intermedio sup.', en: 'Upper-Intermediate', fr: 'Interm. supérieur',  es: 'Interm. superior',de: 'Gute Mittelstufe', cs: 'Vyšší středně pokr.', ru: 'Выше среднего', pt: 'Interm. superior',el: 'Ανώτερο μεσαίο'   },
-  C1: { pl: 'Zaawansowany',        it: 'Avanzato',        en: 'Advanced',           fr: 'Avancé',             es: 'Avanzado',        de: 'Fortgeschritten',  cs: 'Pokročilý',       ru: 'Продвинутый',     pt: 'Avançado',        el: 'Προχωρημένος'     },
-};
 
 // ─── ModelPicker ──────────────────────────────────────────────────────────────
 
@@ -147,7 +141,7 @@ const ModelPicker: React.FC<{
       // sortuj: darmowe/popularne najpierw (po nazwie)
       setModels(list.sort((a, b) => a.id.localeCompare(b.id)));
     } catch {
-      setError(lang === 'it' ? 'Impossibile caricare i modelli.' : lang === 'en' ? 'Could not load models.' : lang === 'fr' ? 'Impossible de charger les modèles.' : lang === 'es' ? 'No se pudieron cargar los modelos.' : lang === 'de' ? 'Modelle konnten nicht geladen werden.' : lang === 'cs' ? 'Nepodařilo se načíst modely.' : lang === 'ru' ? 'Не удалось загрузить модели.' : lang === 'pt' ? 'Não foi possível carregar os modelos.' : lang === 'el' ? 'Δεν ήταν δυνατή η φόρτωση των μοντέλων.' : 'Nie udało się załadować modeli.');
+      setError(lang === 'pl' ? 'Nie udało się załadować modeli.' : (LANGUAGE_CONFIGS[lang as TargetLang]?.modelLoadErrorMsg ?? 'Nie udało się załadować modeli.'));
     } finally {
       setLoading(false);
     }
@@ -341,9 +335,9 @@ const LessonCard: React.FC<{
   const tl = lesson.targetLang ?? 'it';
   const gradient = DIFF_GRADIENT[lesson.difficulty_level] ?? DIFF_GRADIENT.B1;
   const diffLabels = DIFF_LABELS[lesson.difficulty_level];
-  const diffLabel = diffLabels ? diffLabels[lang === 'pl' ? 'pl' : (tl in diffLabels ? tl as keyof typeof diffLabels : 'it')] : lesson.difficulty_level;
+  const diffLabel = diffLabels?.[lang === 'pl' ? 'pl' : tl] ?? lesson.difficulty_level;
   const getTlText = (b?: { it?: string; en?: string; fr?: string; es?: string; de?: string; cs?: string; ru?: string; pt?: string; el?: string; pl: string }) =>
-    b ? (tl === 'en' ? b.en : tl === 'fr' ? b.fr : tl === 'es' ? b.es : tl === 'de' ? b.de : tl === 'cs' ? b.cs : tl === 'ru' ? b.ru : tl === 'pt' ? b.pt : tl === 'el' ? b.el : b.it) ?? b.pl : '';
+    b ? (b[tl as keyof typeof b] ?? b.pl) : '';
   const topicText = lang === 'pl' ? lesson.topic.pl : getTlText(lesson.topic);
   const subtitleText = lesson.subtitle ? (lang === 'pl' ? lesson.subtitle.pl : getTlText(lesson.subtitle)) : null;
   const introText = lang === 'pl' ? lesson.introduction?.pl : getTlText(lesson.introduction);
@@ -1446,7 +1440,7 @@ const AppInner: React.FC<{
                   >
                     {d}
                     <span className="ml-1 opacity-70 font-normal text-[9px]">
-                      {DIFF_LABELS[d]?.[l === 'pl' ? 'pl' : isEn ? 'en' : isFr ? 'fr' : isEs ? 'es' : isDe ? 'de' : isCs ? 'cs' : isRu ? 'ru' : isPt ? 'pt' : isEl ? 'el' : 'it'] ?? ''}
+                      {DIFF_LABELS[d]?.[l] ?? ''}
                     </span>
                   </button>
                 ))}
@@ -1575,17 +1569,6 @@ const AppInner: React.FC<{
 
 // ─── Home Screen ──────────────────────────────────────────────────────────────
 
-const LANGS_LIST: Array<{ code: TargetLang; name: string; native: string }> = [
-  { code: 'en', name: 'Angielski',   native: 'English'    },
-  { code: 'fr', name: 'Francuski',   native: 'Français'   },
-  { code: 'es', name: 'Hiszpański',  native: 'Español'    },
-  { code: 'it', name: 'Włoski',      native: 'Italiano'   },
-  { code: 'de', name: 'Niemiecki',   native: 'Deutsch'    },
-  { code: 'cs', name: 'Czeski',      native: 'Čeština'    },
-  { code: 'ru', name: 'Rosyjski',    native: 'Русский'    },
-  { code: 'pt', name: 'Portugalski', native: 'Português'  },
-  { code: 'el', name: 'Grecki',      native: 'Ελληνικά'  },
-];
 
 const HomeScreen: React.FC<{
   onSelect: (lang: TargetLang) => void;

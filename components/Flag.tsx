@@ -1,4 +1,10 @@
 import React from 'react';
+import { LANGUAGE_CONFIGS } from '../services/languages.config';
+
+const FLAG_LABELS: Record<string, string> = {
+  pl: 'Flaga Polski',
+  ...Object.fromEntries(Object.values(LANGUAGE_CONFIGS).map(c => [c.code, c.flagLabelPl])),
+};
 
 // ─── Inline SVG flags — no external requests, works everywhere ────────────────
 // Italian flag: green / white / red (3 vertical stripes)
@@ -21,7 +27,7 @@ export const Flag: React.FC<FlagProps> = ({
   'aria-hidden': ariaHidden,
 }) => {
   const hidden = ariaHidden === true || ariaHidden === 'true';
-  const label = hidden ? undefined : (ariaLabel ?? (code === 'it' ? 'Flaga Włoch' : code === 'en' ? 'Flaga Wielkiej Brytanii' : code === 'fr' ? 'Flaga Francji' : code === 'es' ? 'Flaga Hiszpanii' : code === 'de' ? 'Flaga Niemiec' : code === 'cs' ? 'Flaga Czech' : code === 'ru' ? 'Flaga Rosji' : code === 'pt' ? 'Flaga Portugalii' : code === 'el' ? 'Flaga Grecji' : 'Flaga Polski'));
+  const label = hidden ? undefined : (ariaLabel ?? FLAG_LABELS[code] ?? 'Flaga');
   const w = Math.round(size * 1.5);
   const h = size;
 
