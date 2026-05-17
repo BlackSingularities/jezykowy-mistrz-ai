@@ -1599,6 +1599,11 @@ const HomeScreen: React.FC<{
   const handleModelChange = (modelId: string) => {
     setActiveModel(modelId);
     saveModel(modelId);
+    fetch('/api/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: modelId }),
+    }).catch(() => {});
   };
 
   return (

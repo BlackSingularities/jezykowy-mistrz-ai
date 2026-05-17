@@ -380,13 +380,14 @@ export interface ORModel {
   top_provider?: { context_length?: number };
 }
 
-export const DEFAULT_MODEL = "google/gemini-3-pro-preview";
+export const DEFAULT_MODEL = "google/gemini-3.1-pro-preview";
 const MODEL_STORAGE_KEY = "openrouter_model";
+
+const STALE_MODELS = new Set(["google/gemini-2.5-flash", "google/gemini-3-pro-preview"]);
 
 export function getSavedModel(): string {
   const saved = localStorage.getItem(MODEL_STORAGE_KEY);
-  // If the saved model was the old broken default, reset it
-  if (!saved || saved === "google/gemini-2.5-flash") {
+  if (!saved || STALE_MODELS.has(saved)) {
     localStorage.setItem(MODEL_STORAGE_KEY, DEFAULT_MODEL);
     return DEFAULT_MODEL;
   }

@@ -8,7 +8,9 @@
       "Bash(npm run build:*)",
       "Bash(python:*)",
       "Bash(python3:*)",
-      "Bash(npx vite build:*)"
+      "Bash(npx vite build:*)",
+      "mcp__Claude_in_Chrome__tabs_context_mcp",
+      "Bash(curl -s \"http://localhost:3000/api/models\")"
     ]
   }
 }
