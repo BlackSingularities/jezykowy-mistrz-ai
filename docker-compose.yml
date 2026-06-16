@@ -1,0 +1,18 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: jezyki_ai
+    restart: unless-stopped
+    environment:
+      VITE_BASE_PATH: /jezyki-ai/
+    volumes:
+      - ./persist/history:/app/history
+    networks:
+      - webproxy
+
+networks:
+  webproxy:
+    name: webproxy
+    external: true

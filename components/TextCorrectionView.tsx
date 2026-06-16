@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react';
+import { apiUrl } from '../apiUrl';
 import {
   XMarkIcon,
   SparklesIcon,
@@ -128,7 +129,7 @@ export const TextCorrectionView: React.FC<TextCorrectionViewProps> = ({ onClose,
     setError('');
     setResult(null);
     try {
-      const res = await fetch('/api/correct', {
+      const res = await fetch(apiUrl('/api/correct'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text: text.trim(), lang: selectedLang, mode: corrMode }),

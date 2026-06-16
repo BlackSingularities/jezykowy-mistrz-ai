@@ -12,6 +12,11 @@ const EXERCISES_DIR = path.resolve(__dirname, 'history', 'exercises');
 // Plik konfiguracyjny serwera (klucz API, wybrany model)
 const CONFIG_FILE = path.resolve(__dirname, 'history', '.config.json');
 
+// Bazowy prefiks ścieżki (Vite `base`) - ustawiany przy wdrożeniu pod prefiksem (np. "/jezyki-ai/")
+const BASE_PATH = process.env.VITE_BASE_PATH || '/';
+const API_PREFIX = BASE_PATH === '/' ? '' : BASE_PATH.replace(/\/$/, '');
+
+
 function ensureHistoryDir() {
   if (!fs.existsSync(HISTORY_DIR)) fs.mkdirSync(HISTORY_DIR, { recursive: true });
 }
@@ -196,7 +201,7 @@ function historyApiPlugin() {
       } catch { /* ignore startup errors */ }
 
       // ── GET /api/history ────────────────────────────────────────────────────
-      server.middlewares.use('/api/history', (req: any, res: any, next: any) => {
+      server.middlewares.use(`${API_PREFIX}/api/history`, (req: any, res: any, next: any) => {
         if (req.url !== '/' && req.url !== '') { next(); return; }
         res.setHeader('Content-Type', 'application/json');
 
@@ -221,7 +226,7 @@ function historyApiPlugin() {
       });
 
       // ── /api/history/:id ────────────────────────────────────────────────────
-      server.middlewares.use('/api/history/', (req: any, res: any, next: any) => {
+      server.middlewares.use(`${API_PREFIX}/api/history/`, (req: any, res: any, next: any) => {
         const match = req.url?.match(/^\/([^/?]+)$/);
         if (!match) { next(); return; }
         const id = match[1];
@@ -264,7 +269,7 @@ function historyApiPlugin() {
       });
 
       // ── GET /api/jobs (list) + POST /api/jobs (create) ─────────────────────
-      server.middlewares.use('/api/jobs', (req: any, res: any, next: any) => {
+      server.middlewares.use(`${API_PREFIX}/api/jobs`, (req: any, res: any, next: any) => {
         if (req.url !== '/' && req.url !== '') { next(); return; }
         res.setHeader('Content-Type', 'application/json');
 
@@ -323,7 +328,7 @@ function historyApiPlugin() {
       });
 
       // ── GET /api/exercises (list all) ────────────────────────────────────────
-      server.middlewares.use('/api/exercises', (req: any, res: any, next: any) => {
+      server.middlewares.use(`${API_PREFIX}/api/exercises`, (req: any, res: any, next: any) => {
         if (req.url !== '/' && req.url !== '') { next(); return; }
         res.setHeader('Content-Type', 'application/json');
 
@@ -348,7 +353,7 @@ function historyApiPlugin() {
       });
 
       // ── /api/exercises/:lessonId ─────────────────────────────────────────────
-      server.middlewares.use('/api/exercises/', (req: any, res: any, next: any) => {
+      server.middlewares.use(`${API_PREFIX}/api/exercises/`, (req: any, res: any, next: any) => {
         const match = req.url?.match(/^\/([^/?]+)$/);
         if (!match) { next(); return; }
         const lessonId = match[1];
@@ -391,7 +396,7 @@ function historyApiPlugin() {
       });
 
       // ── DELETE /api/jobs/:id + POST /api/jobs/:id/retry ────────────────────
-      server.middlewares.use('/api/jobs/', (req: any, res: any, next: any) => {
+      server.middlewares.use(`${API_PREFIX}/api/jobs/`, (req: any, res: any, next: any) => {
         res.setHeader('Content-Type', 'application/json');
 
         if (req.method === 'DELETE') {
@@ -431,7 +436,7 @@ function historyApiPlugin() {
       });
 
       // ── GET /api/config + POST /api/config ──────────────────────────────────
-      server.middlewares.use('/api/config', (req: any, res: any, next: any) => {
+      server.middlewares.use(`${API_PREFIX}/api/config`, (req: any, res: any, next: any) => {
         if (req.url !== '/' && req.url !== '') { next(); return; }
         res.setHeader('Content-Type', 'application/json');
 
@@ -466,7 +471,7 @@ function historyApiPlugin() {
       });
 
       // ── GET /api/models (z cache'em) ─────────────────────────────────────────
-      server.middlewares.use('/api/models', async (req: any, res: any, next: any) => {
+      server.middlewares.use(`${API_PREFIX}/api/models`, async (req: any, res: any, next: any) => {
         if (req.url !== '/' && req.url !== '') { next(); return; }
         if (req.method !== 'GET') { next(); return; }
         res.setHeader('Content-Type', 'application/json');
@@ -496,7 +501,7 @@ function historyApiPlugin() {
       });
 
       // ── POST /api/correct (korekcja tekstu przez serwer) ─────────────────────
-      server.middlewares.use('/api/correct', async (req: any, res: any, next: any) => {
+      server.middlewares.use(`${API_PREFIX}/api/correct`, async (req: any, res: any, next: any) => {
         if (req.url !== '/' && req.url !== '') { next(); return; }
         if (req.method !== 'POST') { next(); return; }
         res.setHeader('Content-Type', 'application/json');
@@ -529,7 +534,7 @@ function historyApiPlugin() {
       });
 
       // ── POST /api/generate-exercises (generowanie ćwiczeń przez serwer) ─────
-      server.middlewares.use('/api/generate-exercises', async (req: any, res: any, next: any) => {
+      server.middlewares.use(`${API_PREFIX}/api/generate-exercises`, async (req: any, res: any, next: any) => {
         if (req.url !== '/' && req.url !== '') { next(); return; }
         if (req.method !== 'POST') { next(); return; }
         res.setHeader('Content-Type', 'application/json');
@@ -571,9 +576,11 @@ function historyApiPlugin() {
 }
 
 export default defineConfig({
+  base: BASE_PATH,
   server: {
     port: 3000,
     host: '0.0.0.0',
+    allowedHosts: true,
   },
   plugins: [
     react(),

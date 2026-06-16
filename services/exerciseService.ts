@@ -1,4 +1,5 @@
 import OpenAI from "openai";
+import { apiUrl } from '../apiUrl';
 import { Lesson, Exercise, ExerciseSet, TargetLang } from "../types";
 
 const MAX_EXERCISES = 20;
@@ -291,7 +292,7 @@ export async function generateExercises(
   count: number = MAX_EXERCISES,
   existingExerciseIds: string[] = []
 ): Promise<ExerciseSet> {
-  const res = await fetch('/api/generate-exercises', {
+  const res = await fetch(apiUrl('/api/generate-exercises'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ lesson, count, existingExerciseIds }),
@@ -329,7 +330,7 @@ export async function appendExercises(
 // ─── Storage helpers ──────────────────────────────────────────────────────────
 
 export async function saveExerciseSet(set: ExerciseSet): Promise<void> {
-  await fetch(`/api/exercises/${set.lessonId}`, {
+  await fetch(apiUrl(`/api/exercises/${set.lessonId}`), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(set),
@@ -338,7 +339,7 @@ export async function saveExerciseSet(set: ExerciseSet): Promise<void> {
 
 export async function loadExerciseSet(lessonId: string): Promise<ExerciseSet | null> {
   try {
-    const res = await fetch(`/api/exercises/${lessonId}`);
+    const res = await fetch(apiUrl(`/api/exercises/${lessonId}`));
     if (!res.ok) return null;
     return await res.json();
   } catch {
@@ -348,7 +349,7 @@ export async function loadExerciseSet(lessonId: string): Promise<ExerciseSet | n
 
 export async function loadAllExerciseSets(): Promise<ExerciseSet[]> {
   try {
-    const res = await fetch("/api/exercises");
+    const res = await fetch(apiUrl("/api/exercises"));
     if (!res.ok) return [];
     return await res.json();
   } catch {
@@ -357,5 +358,5 @@ export async function loadAllExerciseSets(): Promise<ExerciseSet[]> {
 }
 
 export async function deleteExerciseSet(lessonId: string): Promise<void> {
-  await fetch(`/api/exercises/${lessonId}`, { method: "DELETE" });
+  await fetch(apiUrl(`/api/exercises/${lessonId}`), { method: "DELETE" });
 }

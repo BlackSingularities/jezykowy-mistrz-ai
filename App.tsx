@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, FormEvent, useCallback } from 'react';
+import { apiUrl } from './apiUrl';
 import { createRoot } from 'react-dom/client';
 import { getSavedModel, saveModel, ORModel } from './services/aiService';
 import { LessonView, getFavorites, toggleFavorite } from './components/LessonView';
@@ -47,7 +48,7 @@ const APP_MODE_KEY   = 'app_mode'; // 'it' | 'en'
 
 async function loadHistory(): Promise<Lesson[]> {
   try {
-    const res = await fetch('/api/history');
+    const res = await fetch(apiUrl('/api/history'));
     if (!res.ok) throw new Error('api');
     const data = await res.json();
     if (Array.isArray(data) && data.length > 0) return data;
@@ -71,7 +72,7 @@ async function loadHistory(): Promise<Lesson[]> {
 
 async function saveLesson(lesson: Lesson): Promise<void> {
   try {
-    await fetch(`/api/history/${lesson.id}`, {
+    await fetch(apiUrl(`/api/history/${lesson.id}`), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(lesson),
@@ -86,7 +87,7 @@ async function saveLesson(lesson: Lesson): Promise<void> {
 
 async function deleteLesson(id: string): Promise<void> {
   try {
-    await fetch(`/api/history/${id}`, { method: 'DELETE' });
+    await fetch(apiUrl(`/api/history/${id}`), { method: 'DELETE' });
   } catch {
     const existing: Lesson[] = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
     localStorage.setItem(HISTORY_KEY, JSON.stringify(existing.filter(l => l.id !== id)));
@@ -141,7 +142,7 @@ const ModelPicker: React.FC<{
     setLoading(true);
     setError('');
     try {
-      const res = await fetch('/api/models');
+      const res = await fetch(apiUrl('/api/models'));
       if (!res.ok) throw new Error('Server error');
       const list: ORModel[] = await res.json();
       // sortuj: darmowe/popularne najpierw (po nazwie)
@@ -767,7 +768,7 @@ const AppInner: React.FC<{
 
     const poll = async () => {
       try {
-        const res = await fetch('/api/jobs');
+        const res = await fetch(apiUrl('/api/jobs'));
         if (!res.ok) return;
         const serverJobs: Array<{
           id: string; topic: string; targetLang: string;
@@ -789,7 +790,7 @@ const AppInner: React.FC<{
         for (const sj of serverJobs) {
           if (sj.status === 'done' && sj.lessonId && !pendingLessonLoads.current.has(sj.lessonId)) {
             pendingLessonLoads.current.add(sj.lessonId);
-            fetch(`/api/history/${sj.lessonId}`)
+            fetch(apiUrl(`/api/history/${sj.lessonId}`))
               .then(r => r.ok ? r.json() : null)
               .then(lesson => {
                 if (lesson) setHistory(prev => [lesson, ...prev.filter(l => l.id !== lesson.id)]);
@@ -848,7 +849,7 @@ const AppInner: React.FC<{
     const jobTopics = hasImage ? [topics[0]] : topics;
     const settled = await Promise.allSettled(
       jobTopics.map((topic, i) =>
-        fetch('/api/jobs', {
+        fetch(apiUrl('/api/jobs'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -905,7 +906,7 @@ const AppInner: React.FC<{
     if (job?.status === 'running') return;
     setQueue(prev => prev.filter(j => j.qid !== qid));
     if (!qid.startsWith('tmp-')) {
-      await fetch(`/api/jobs/${qid}`, { method: 'DELETE' }).catch(() => {});
+      await fetch(apiUrl(`/api/jobs/${qid}`), { method: 'DELETE' }).catch(() => {});
     }
   };
 
@@ -913,7 +914,7 @@ const AppInner: React.FC<{
     setQueue(prev => prev.map(j =>
       j.qid === qid ? { ...j, status: 'pending' as QueueStatus, error: undefined } : j
     ));
-    await fetch(`/api/jobs/${qid}/retry`, { method: 'POST' }).catch(() => {});
+    await fetch(apiUrl(`/api/jobs/${qid}/retry`), { method: 'POST' }).catch(() => {});
   };
 
   const clearFinished = async () => {
@@ -921,7 +922,7 @@ const AppInner: React.FC<{
     setQueue(prev => prev.filter(j => j.status !== 'done' && j.status !== 'error'));
     await Promise.allSettled(
       finishedIds.filter(id => !id.startsWith('tmp-')).map(id =>
-        fetch(`/api/jobs/${id}`, { method: 'DELETE' })
+        fetch(apiUrl(`/api/jobs/${id}`), { method: 'DELETE' })
       )
     );
   };
@@ -943,7 +944,7 @@ const AppInner: React.FC<{
     setActiveModel(modelId);
     saveModel(modelId);
     // Synchronizuj wybrany model z konfiguracją serwera
-    fetch('/api/config', {
+    fetch(apiUrl('/api/config'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ model: modelId }),
@@ -962,7 +963,7 @@ const AppInner: React.FC<{
 
       // If not loaded yet, fetch directly from server
       if (!lesson) {
-        const res = await fetch(`/api/history/${job.lessonId}`);
+        const res = await fetch(apiUrl(`/api/history/${job.lessonId}`));
         if (res.ok) {
           lesson = await res.json();
           if (lesson) setHistory(prev => [lesson!, ...prev.filter(l => l.id !== lesson!.id)]);
@@ -1599,7 +1600,7 @@ const HomeScreen: React.FC<{
   const handleModelChange = (modelId: string) => {
     setActiveModel(modelId);
     saveModel(modelId);
-    fetch('/api/config', {
+    fetch(apiUrl('/api/config'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ model: modelId }),
@@ -1769,7 +1770,7 @@ const App: React.FC = () => {
 
   // Przy starcie: sprawdź konfigurację serwera (klucz API, model)
   useEffect(() => {
-    fetch('/api/config')
+    fetch(apiUrl('/api/config'))
       .then(r => r.json())
       .then(({ hasKey: serverHasKey, model }: { hasKey: boolean; model: string }) => {
         if (serverHasKey) {
@@ -1781,7 +1782,7 @@ const App: React.FC = () => {
           const localKey = localStorage.getItem(API_KEY_STORAGE);
           if (localKey) {
             // Przenieś klucz z localStorage na serwer
-            fetch('/api/config', {
+            fetch(apiUrl('/api/config'), {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ apiKey: localKey, model: getSavedModel() || '' }),
@@ -1802,7 +1803,7 @@ const App: React.FC = () => {
   const saveApiKey = async (key: string) => {
     // Zapisz na serwerze (source of truth)
     try {
-      await fetch('/api/config', {
+      await fetch(apiUrl('/api/config'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ apiKey: key, model: getSavedModel() || '' }),
