@@ -861,16 +861,6 @@ export const LessonView: React.FC<LessonViewProps> = ({ lesson, onBack, onChange
               </span>
             </button>
 
-            {/* Klucz API */}
-            {onChangeKey && (
-              <button
-                onClick={onChangeKey}
-                title={L.apiKey}
-                className="nav-icon-btn"
-              >
-                <KeyIcon className="w-3.5 h-3.5" />
-              </button>
-            )}
           </div>
         </div>
       </div>

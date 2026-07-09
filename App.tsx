@@ -24,7 +24,7 @@ import {
   ExclamationCircleIcon,
   AcademicCapIcon,
 } from '@heroicons/react/24/solid';
-import { LanguageIcon, SunIcon, MoonIcon, ArrowPathIcon, StarIcon as StarOutlineIcon, ArrowLeftIcon, PhotoIcon, XCircleIcon, PencilSquareIcon, Cog6ToothIcon } from '@heroicons/react/24/outline';
+import { LanguageIcon, SunIcon, MoonIcon, ArrowPathIcon, StarIcon as StarOutlineIcon, ArrowLeftIcon, PhotoIcon, XCircleIcon, PencilSquareIcon, Cog6ToothIcon, ArrowRightOnRectangleIcon, ShieldCheckIcon } from '@heroicons/react/24/outline';
 
 // ─── Queue types ──────────────────────────────────────────────────────────────
 
@@ -44,6 +44,14 @@ const API_KEY_STORAGE = 'openrouter_api_key';
 const HISTORY_KEY    = 'italian_app_history'; // localStorage fallback key
 const APP_MODE_KEY   = 'app_mode'; // 'it' | 'en'
 
+type AuthUser = {
+  id: number;
+  email: string;
+  name: string;
+  role: 'admin' | 'user';
+  isAdmin: boolean;
+};
+
 // ─── History persistence: osobne pliki ───────────────────────────────────────
 
 async function loadHistory(): Promise<Lesson[]> {
@@ -51,22 +59,9 @@ async function loadHistory(): Promise<Lesson[]> {
     const res = await fetch(apiUrl('/api/history'));
     if (!res.ok) throw new Error('api');
     const data = await res.json();
-    if (Array.isArray(data) && data.length > 0) return data;
-    // Migracja ze starego localStorage (jednorazowa)
-    const local = localStorage.getItem(HISTORY_KEY);
-    if (local) {
-      const parsed = JSON.parse(local) as Lesson[];
-      if (parsed.length > 0) {
-        // zapisz każdą lekcję jako osobny plik
-        await Promise.all(parsed.map(l => saveLesson(l)));
-        localStorage.removeItem(HISTORY_KEY);
-        return parsed;
-      }
-    }
-    return [];
+    return Array.isArray(data) ? data : [];
   } catch {
-    try { return JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]'); }
-    catch { return []; }
+    return [];
   }
 }
 
@@ -77,21 +72,13 @@ async function saveLesson(lesson: Lesson): Promise<void> {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(lesson),
     });
-  } catch {
-    // fallback: zapisz cały array do localStorage
-    const existing: Lesson[] = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
-    const updated = [lesson, ...existing.filter(l => l.id !== lesson.id)];
-    localStorage.setItem(HISTORY_KEY, JSON.stringify(updated));
-  }
+  } catch { /* server is the source of truth */ }
 }
 
 async function deleteLesson(id: string): Promise<void> {
   try {
     await fetch(apiUrl(`/api/history/${id}`), { method: 'DELETE' });
-  } catch {
-    const existing: Lesson[] = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
-    localStorage.setItem(HISTORY_KEY, JSON.stringify(existing.filter(l => l.id !== id)));
-  }
+  } catch { /* server is the source of truth */ }
 }
 
 // ─── Difficulty ───────────────────────────────────────────────────────────────
@@ -690,7 +677,10 @@ const AppInner: React.FC<{
   onChangeKey: () => void;
   onBackToHome: () => void;
   onChangeLang: (lang: TargetLang) => void;
-}> = ({ onChangeKey, onBackToHome, onChangeLang }) => {
+  authUser: AuthUser;
+  onOpenAdmin: () => void;
+  onLogout: () => void;
+}> = ({ onChangeKey, onBackToHome, onChangeLang, authUser, onOpenAdmin, onLogout }) => {
   const { globalLang, toggleGlobal, targetLang } = useLang();
   const { theme } = useTheme();
   const isEs = targetLang === 'es';
@@ -855,7 +845,6 @@ const AppInner: React.FC<{
           body: JSON.stringify({
             topic,
             targetLang,
-            model: activeModel,
             ...(capturedImage && i === 0 ? { imageData: capturedImage } : {}),
           }),
         })
@@ -1130,6 +1119,14 @@ const AppInner: React.FC<{
               className="nav-icon-btn"
             >
               <Cog6ToothIcon className="w-4 h-4" />
+            </button>
+            {authUser.isAdmin && (
+              <button onClick={onOpenAdmin} title="Panel administratora" className="nav-icon-btn">
+                <ShieldCheckIcon className="w-4 h-4" />
+              </button>
+            )}
+            <button onClick={onLogout} title="Wyloguj" className="nav-icon-btn">
+              <ArrowRightOnRectangleIcon className="w-4 h-4" />
             </button>
           </div>
         </div>
@@ -1551,15 +1548,13 @@ const AppInner: React.FC<{
         onClose={() => setShowSettings(false)}
         onChangeKey={onChangeKey}
         lang={l}
-        activeModel={activeModel}
-        onModelChange={handleModelChange}
       />
 
       <footer className="py-5 border-t"
         style={{ color: 'var(--c-faint)', borderColor: 'var(--c-border)', background: 'var(--c-surface-2)' }}>
         <div className="max-w-screen-2xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
           <span className="text-xs">
-            {L.appName} &copy; 2025 · Powered by OpenRouter
+            {L.appName} &copy; 2025
           </span>
           {filteredHistory.length > 0 && (
             <div className="flex items-center gap-2 text-[10px]">
@@ -1592,7 +1587,10 @@ const HomeScreen: React.FC<{
   onSelect: (lang: TargetLang) => void;
   onTextCorrect: () => void;
   onChangeKey: () => void;
-}> = ({ onSelect, onTextCorrect, onChangeKey }) => {
+  authUser: AuthUser;
+  onOpenAdmin: () => void;
+  onLogout: () => void;
+}> = ({ onSelect, onTextCorrect, onChangeKey, authUser, onOpenAdmin, onLogout }) => {
   const { theme, toggleTheme } = useTheme();
   const [showSettings, setShowSettings] = useState(false);
   const [activeModel, setActiveModel] = useState<string>(() => getSavedModel());
@@ -1651,6 +1649,14 @@ const HomeScreen: React.FC<{
             >
               <Cog6ToothIcon className="w-4 h-4" />
             </button>
+            {authUser.isAdmin && (
+              <button onClick={onOpenAdmin} className="nav-icon-btn" title="Panel administratora">
+                <ShieldCheckIcon className="w-4 h-4" />
+              </button>
+            )}
+            <button onClick={onLogout} className="nav-icon-btn" title="Wyloguj">
+              <ArrowRightOnRectangleIcon className="w-4 h-4" />
+            </button>
           </div>
         </div>
       </nav>
@@ -1666,7 +1672,7 @@ const HomeScreen: React.FC<{
               style={{ background: 'var(--c-surface)', border: '1px solid var(--c-border)', color: 'var(--c-muted)' }}
             >
               <SparklesIcon className="w-3 h-3 shrink-0" style={{ color: 'var(--c-green)' }} />
-              Powered by OpenRouter AI
+              Asystent nauki AI
             </div>
             <h1 className="text-4xl md:text-5xl font-serif font-bold tracking-tight leading-tight">
               <span className="hero-gradient">Językowy Mistrz AI</span>
@@ -1741,7 +1747,7 @@ const HomeScreen: React.FC<{
       {/* Footer */}
       <footer className="py-4 border-t" style={{ borderColor: 'var(--c-border)', background: 'var(--c-surface-2)' }}>
         <p className="text-center text-xs" style={{ color: 'var(--c-faint)' }}>
-          Językowy Mistrz AI &copy; 2025 · Powered by OpenRouter
+          Językowy Mistrz AI &copy; 2025
         </p>
       </footer>
 
@@ -1751,8 +1757,6 @@ const HomeScreen: React.FC<{
         onClose={() => setShowSettings(false)}
         onChangeKey={onChangeKey}
         lang="pl"
-        activeModel={activeModel}
-        onModelChange={handleModelChange}
       />
     </div>
   );
@@ -1760,58 +1764,158 @@ const HomeScreen: React.FC<{
 
 // ─── Root App ─────────────────────────────────────────────────────────────────
 
-const App: React.FC = () => {
-  // Trzy stany: null = ładowanie, false = brak klucza, true = klucz ustawiony
-  const [hasKey, setHasKey] = useState<boolean | null>(null);
-  const [showKeyModal, setShowKeyModal] = useState(false);
-  const [showHomeCorrectorModal, setShowHomeCorrectorModal] = useState(false);
-  // Zawsze startuje od strony głównej (targetLang = null)
-  const [targetLang, setTargetLang] = useState<TargetLang | null>(null);
+const AuthScreen: React.FC<{ onAuthenticated: (user: AuthUser) => void }> = ({ onAuthenticated }) => {
+  const [mode, setMode] = useState<'login' | 'register'>('login');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [name, setName] = useState('');
+  const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  // Przy starcie: sprawdź konfigurację serwera (klucz API, model)
-  useEffect(() => {
-    fetch(apiUrl('/api/config'))
-      .then(r => r.json())
-      .then(({ hasKey: serverHasKey, model }: { hasKey: boolean; model: string }) => {
-        if (serverHasKey) {
-          setHasKey(true);
-          // Synchronizuj model z serwera do localStorage jeśli nie jest ustawiony lokalnie
-          if (model && !getSavedModel()) saveModel(model);
-        } else {
-          // Nie ma klucza na serwerze — sprawdź localStorage i spróbuj migrować
-          const localKey = localStorage.getItem(API_KEY_STORAGE);
-          if (localKey) {
-            // Przenieś klucz z localStorage na serwer
-            fetch(apiUrl('/api/config'), {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ apiKey: localKey, model: getSavedModel() || '' }),
-            })
-              .then(() => setHasKey(true))
-              .catch(() => setHasKey(true)); // lokalny klucz nadal istnieje
-          } else {
-            setHasKey(false);
-          }
-        }
-      })
-      .catch(() => {
-        // Serwer niedostępny — użyj localStorage jako fallback
-        setHasKey(!!localStorage.getItem(API_KEY_STORAGE));
-      });
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const saveApiKey = async (key: string) => {
-    // Zapisz na serwerze (source of truth)
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+    setMessage('');
     try {
-      await fetch(apiUrl('/api/config'), {
+      const res = await fetch(apiUrl(`/api/auth/${mode}`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ apiKey: key, model: getSavedModel() || '' }),
+        body: JSON.stringify({ email, password, name }),
       });
-    } catch { /* ignore — fallback poniżej */ }
-    // Zachowaj w localStorage jako fallback
-    localStorage.setItem(API_KEY_STORAGE, key);
-    setHasKey(true);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Nie udalo sie zalogowac.');
+      if (data.user) {
+        onAuthenticated(data.user);
+        return;
+      }
+      setMessage('Konto zostalo zgloszone. Poczekaj na akceptacje administratora i mail aktywacyjny.');
+      setMode('login');
+    } catch (err: any) {
+      setError(err?.message || 'Wystapil blad.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen flex items-center justify-center px-4" style={{ background: 'var(--c-bg)', color: 'var(--c-text)' }}>
+      <div className="card p-8 max-w-sm w-full space-y-6">
+        <div className="text-center space-y-2">
+          <h1 className="text-2xl font-serif font-bold">Jezykowy Mistrz AI</h1>
+          <p className="text-sm" style={{ color: 'var(--c-muted)' }}>
+            {mode === 'login' ? 'Zaloguj sie, aby korzystac z aplikacji.' : 'Zaloz konto. Pierwszy uzytkownik zostanie administratorem.'}
+          </p>
+        </div>
+        <form onSubmit={submit} className="space-y-3">
+          {mode === 'register' && <input value={name} onChange={e => setName(e.target.value)} placeholder="Imie" className="w-full px-3 py-2 rounded-lg text-sm outline-none" style={{ background: 'var(--c-bg)', border: '1px solid var(--c-border)', color: 'var(--c-text)' }} />}
+          <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="Email" className="w-full px-3 py-2 rounded-lg text-sm outline-none" style={{ background: 'var(--c-bg)', border: '1px solid var(--c-border)', color: 'var(--c-text)' }} autoFocus />
+          <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Haslo minimum 8 znakow" className="w-full px-3 py-2 rounded-lg text-sm outline-none" style={{ background: 'var(--c-bg)', border: '1px solid var(--c-border)', color: 'var(--c-text)' }} />
+          {error && <p className="text-xs" style={{ color: 'var(--c-red)' }}>{error}</p>}
+          {message && <p className="text-xs" style={{ color: 'var(--c-green)' }}>{message}</p>}
+          <button disabled={loading || !email || !password} className="w-full py-2.5 rounded-lg font-semibold text-sm disabled:opacity-40" style={{ background: 'var(--c-text)', color: '#fff' }}>
+            {loading ? 'Przetwarzanie...' : mode === 'login' ? 'Zaloguj' : 'Zarejestruj'}
+          </button>
+        </form>
+        <button onClick={() => { setMode(mode === 'login' ? 'register' : 'login'); setError(''); setMessage(''); }} className="w-full text-xs underline" style={{ color: 'var(--c-muted)' }}>
+          {mode === 'login' ? 'Nie masz konta? Zarejestruj sie' : 'Masz konto? Zaloguj sie'}
+        </button>
+      </div>
+    </div>
+  );
+};
+
+const AdminPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => {
+  const [users, setUsers] = useState<any[]>([]);
+  const [config, setConfig] = useState<any>({});
+  const [status, setStatus] = useState('');
+
+  const load = useCallback(async () => {
+    const [usersRes, configRes] = await Promise.all([fetch(apiUrl('/api/admin/users')), fetch(apiUrl('/api/admin/config'))]);
+    if (usersRes.ok) setUsers(await usersRes.json());
+    if (configRes.ok) setConfig(await configRes.json());
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const saveConfig = async (e: FormEvent) => {
+    e.preventDefault();
+    const res = await fetch(apiUrl('/api/admin/config'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(config),
+    });
+    setStatus(res.ok ? 'Zapisano konfiguracje.' : 'Nie udalo sie zapisac konfiguracji.');
+    await load();
+  };
+
+  const approve = async (id: number) => {
+    const res = await fetch(apiUrl(`/api/admin/users/${id}/approve`), { method: 'POST' });
+    const data = await res.json().catch(() => ({}));
+    setStatus(data.mail?.sent ? 'Uzytkownik zaakceptowany, mail wyslany.' : `Uzytkownik zaakceptowany. ${data.mail?.error || 'SMTP nie wyslal maila.'}`);
+    await load();
+  };
+
+  return (
+    <div className="fixed inset-0 z-[70] overflow-y-auto" style={{ background: 'rgba(0,0,0,.45)' }}>
+      <div className="min-h-screen p-4 flex items-start justify-center">
+        <div className="card w-full max-w-4xl p-6 space-y-6 mt-6">
+          <div className="flex items-center justify-between">
+            <h2 className="font-serif font-bold text-xl">Panel administratora</h2>
+            <button onClick={onClose} className="nav-icon-btn"><XMarkIcon className="w-4 h-4" /></button>
+          </div>
+          <form onSubmit={saveConfig} className="grid md:grid-cols-2 gap-3">
+            <input type="password" placeholder={config.hasKey ? 'Klucz API ustawiony - wpisz nowy, aby zmienic' : 'Klucz API'} value={config.apiKey || ''} onChange={e => setConfig((c: any) => ({ ...c, apiKey: e.target.value }))} className="px-3 py-2 rounded-lg text-sm" style={{ background: 'var(--c-bg)', border: '1px solid var(--c-border)' }} />
+            <input placeholder="Model AI" value={config.model || ''} onChange={e => setConfig((c: any) => ({ ...c, model: e.target.value }))} className="px-3 py-2 rounded-lg text-sm" style={{ background: 'var(--c-bg)', border: '1px solid var(--c-border)' }} />
+            <input placeholder="SMTP host" value={config.smtpHost || ''} onChange={e => setConfig((c: any) => ({ ...c, smtpHost: e.target.value }))} className="px-3 py-2 rounded-lg text-sm" style={{ background: 'var(--c-bg)', border: '1px solid var(--c-border)' }} />
+            <input placeholder="SMTP port" value={config.smtpPort || ''} onChange={e => setConfig((c: any) => ({ ...c, smtpPort: e.target.value }))} className="px-3 py-2 rounded-lg text-sm" style={{ background: 'var(--c-bg)', border: '1px solid var(--c-border)' }} />
+            <input placeholder="SMTP user" value={config.smtpUser || ''} onChange={e => setConfig((c: any) => ({ ...c, smtpUser: e.target.value }))} className="px-3 py-2 rounded-lg text-sm" style={{ background: 'var(--c-bg)', border: '1px solid var(--c-border)' }} />
+            <input type="password" placeholder="SMTP password" value={config.smtpPass || ''} onChange={e => setConfig((c: any) => ({ ...c, smtpPass: e.target.value }))} className="px-3 py-2 rounded-lg text-sm" style={{ background: 'var(--c-bg)', border: '1px solid var(--c-border)' }} />
+            <input placeholder="SMTP from" value={config.smtpFrom || ''} onChange={e => setConfig((c: any) => ({ ...c, smtpFrom: e.target.value }))} className="px-3 py-2 rounded-lg text-sm" style={{ background: 'var(--c-bg)', border: '1px solid var(--c-border)' }} />
+            <input placeholder="Publiczny URL aplikacji" value={config.publicAppUrl || ''} onChange={e => setConfig((c: any) => ({ ...c, publicAppUrl: e.target.value }))} className="px-3 py-2 rounded-lg text-sm" style={{ background: 'var(--c-bg)', border: '1px solid var(--c-border)' }} />
+            <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={!!config.smtpSecure} onChange={e => setConfig((c: any) => ({ ...c, smtpSecure: e.target.checked }))} /> SMTP SSL/TLS</label>
+            <button className="py-2 rounded-lg font-semibold text-sm" style={{ background: 'var(--c-text)', color: '#fff' }}>Zapisz konfiguracje</button>
+          </form>
+          {status && <p className="text-xs" style={{ color: 'var(--c-green)' }}>{status}</p>}
+          <div className="space-y-2">
+            <h3 className="font-bold text-sm uppercase">Uzytkownicy</h3>
+            {users.map(user => (
+              <div key={user.id} className="flex items-center justify-between gap-3 p-3 rounded-lg border" style={{ borderColor: 'var(--c-border)', background: 'var(--c-bg)' }}>
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold truncate">{user.email}</p>
+                  <p className="text-xs" style={{ color: 'var(--c-muted)' }}>{user.role} - {user.approved ? 'zaakceptowany' : 'oczekuje'} - {user.active ? 'aktywny' : 'nieaktywny'}</p>
+                </div>
+                {!user.approved && <button onClick={() => approve(user.id)} className="px-3 py-1.5 rounded-lg text-xs font-semibold" style={{ background: 'var(--c-green)', color: '#fff' }}>Akceptuj</button>}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const App: React.FC = () => {
+  const [authUser, setAuthUser] = useState<AuthUser | null>(null);
+  const [authLoaded, setAuthLoaded] = useState(false);
+  const [showAdmin, setShowAdmin] = useState(false);
+  const [showHomeCorrectorModal, setShowHomeCorrectorModal] = useState(false);
+  const [targetLang, setTargetLang] = useState<TargetLang | null>(null);
+
+  useEffect(() => {
+    fetch(apiUrl('/api/auth/me'))
+      .then(r => r.json())
+      .then(({ user }) => setAuthUser(user || null))
+      .catch(() => setAuthUser(null))
+      .finally(() => setAuthLoaded(true));
+  }, []);
+
+  const logout = async () => {
+    await fetch(apiUrl('/api/auth/logout'), { method: 'POST' }).catch(() => {});
+    setAuthUser(null);
+    setTargetLang(null);
+    localStorage.removeItem(APP_MODE_KEY);
   };
 
   const selectLang = (lang: TargetLang) => {
@@ -1824,24 +1928,21 @@ const App: React.FC = () => {
     localStorage.removeItem(APP_MODE_KEY);
   };
 
-  // Ładowanie — czekamy na odpowiedź serwera
-  if (hasKey === null) return null;
-
-  if (!hasKey) return <ApiKeySetup onSave={saveApiKey} />;
+  if (!authLoaded) return null;
+  if (!authUser) return <AuthScreen onAuthenticated={setAuthUser} />;
 
   if (!targetLang) {
     return (
       <LangProvider targetLang="it">
-        {showKeyModal && (
-          <ChangeKeyModal onClose={() => setShowKeyModal(false)} onSave={saveApiKey} />
-        )}
-        {showHomeCorrectorModal && (
-          <TextCorrectionView onClose={() => setShowHomeCorrectorModal(false)} />
-        )}
+        {showAdmin && authUser.isAdmin && <AdminPanel onClose={() => setShowAdmin(false)} />}
+        {showHomeCorrectorModal && <TextCorrectionView onClose={() => setShowHomeCorrectorModal(false)} />}
         <HomeScreen
           onSelect={selectLang}
           onTextCorrect={() => setShowHomeCorrectorModal(true)}
-          onChangeKey={() => setShowKeyModal(true)}
+          onChangeKey={() => setShowAdmin(true)}
+          authUser={authUser}
+          onOpenAdmin={() => setShowAdmin(true)}
+          onLogout={logout}
         />
       </LangProvider>
     );
@@ -1849,10 +1950,15 @@ const App: React.FC = () => {
 
   return (
     <LangProvider targetLang={targetLang}>
-      {showKeyModal && (
-        <ChangeKeyModal onClose={() => setShowKeyModal(false)} onSave={saveApiKey} />
-      )}
-      <AppInner onChangeKey={() => setShowKeyModal(true)} onBackToHome={goHome} onChangeLang={selectLang} />
+      {showAdmin && authUser.isAdmin && <AdminPanel onClose={() => setShowAdmin(false)} />}
+      <AppInner
+        onChangeKey={() => setShowAdmin(true)}
+        onBackToHome={goHome}
+        onChangeLang={selectLang}
+        authUser={authUser}
+        onOpenAdmin={() => setShowAdmin(true)}
+        onLogout={logout}
+      />
     </LangProvider>
   );
 };
