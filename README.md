@@ -5,9 +5,10 @@ Aplikacja webowa do nauki jezykow z generowaniem lekcji, cwiczen i korekta tekst
 ## Dostep i administracja
 
 - Pierwszy zarejestrowany i zalogowany uzytkownik zostaje administratorem.
-- Kolejni uzytkownicy rejestruja konto, ale nie maja dostepu do aplikacji do czasu akceptacji przez administratora.
+- Pierwszy uzytkownik nie wymaga kodu rejestracyjnego ani aktywacji mailem.
+- Kolejni uzytkownicy musza podac kod rejestracyjny ustawiony przez administratora, a potem czekaja na akceptacje.
 - Administrator akceptuje uzytkownikow w panelu administracyjnym. Po akceptacji aplikacja wysyla mail z linkiem aktywacyjnym SMTP.
-- Klucz API, model AI, SMTP i publiczny URL aplikacji sa konfigurowane w panelu administratora.
+- Klucz API, model AI, SMTP, publiczny URL aplikacji i kod rejestracyjny sa konfigurowane w panelu administratora.
 - Zwykly uzytkownik nie widzi modelu AI, klucza API ani informacji o dostawcy.
 
 ## Dane

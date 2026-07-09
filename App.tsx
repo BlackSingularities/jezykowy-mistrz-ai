@@ -1769,6 +1769,7 @@ const AuthScreen: React.FC<{ onAuthenticated: (user: AuthUser) => void }> = ({ o
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
+  const [registrationCode, setRegistrationCode] = useState('');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -1782,7 +1783,7 @@ const AuthScreen: React.FC<{ onAuthenticated: (user: AuthUser) => void }> = ({ o
       const res = await fetch(apiUrl(`/api/auth/${mode}`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password, name }),
+        body: JSON.stringify({ email, password, name, registrationCode }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || 'Nie udalo sie zalogowac.');
@@ -1810,6 +1811,7 @@ const AuthScreen: React.FC<{ onAuthenticated: (user: AuthUser) => void }> = ({ o
         </div>
         <form onSubmit={submit} className="space-y-3">
           {mode === 'register' && <input value={name} onChange={e => setName(e.target.value)} placeholder="Imie" className="w-full px-3 py-2 rounded-lg text-sm outline-none" style={{ background: 'var(--c-bg)', border: '1px solid var(--c-border)', color: 'var(--c-text)' }} />}
+          {mode === 'register' && <input value={registrationCode} onChange={e => setRegistrationCode(e.target.value)} placeholder="Kod rejestracyjny" className="w-full px-3 py-2 rounded-lg text-sm outline-none" style={{ background: 'var(--c-bg)', border: '1px solid var(--c-border)', color: 'var(--c-text)' }} />}
           <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="Email" className="w-full px-3 py-2 rounded-lg text-sm outline-none" style={{ background: 'var(--c-bg)', border: '1px solid var(--c-border)', color: 'var(--c-text)' }} autoFocus />
           <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Haslo minimum 8 znakow" className="w-full px-3 py-2 rounded-lg text-sm outline-none" style={{ background: 'var(--c-bg)', border: '1px solid var(--c-border)', color: 'var(--c-text)' }} />
           {error && <p className="text-xs" style={{ color: 'var(--c-red)' }}>{error}</p>}
@@ -1874,6 +1876,7 @@ const AdminPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => {
             <input type="password" placeholder="SMTP password" value={config.smtpPass || ''} onChange={e => setConfig((c: any) => ({ ...c, smtpPass: e.target.value }))} className="px-3 py-2 rounded-lg text-sm" style={{ background: 'var(--c-bg)', border: '1px solid var(--c-border)' }} />
             <input placeholder="SMTP from" value={config.smtpFrom || ''} onChange={e => setConfig((c: any) => ({ ...c, smtpFrom: e.target.value }))} className="px-3 py-2 rounded-lg text-sm" style={{ background: 'var(--c-bg)', border: '1px solid var(--c-border)' }} />
             <input placeholder="Publiczny URL aplikacji" value={config.publicAppUrl || ''} onChange={e => setConfig((c: any) => ({ ...c, publicAppUrl: e.target.value }))} className="px-3 py-2 rounded-lg text-sm" style={{ background: 'var(--c-bg)', border: '1px solid var(--c-border)' }} />
+            <input placeholder={config.hasRegistrationCode ? 'Kod rejestracyjny ustawiony - wpisz nowy, aby zmienic' : 'Kod rejestracyjny'} value={config.registrationCode || ''} onChange={e => setConfig((c: any) => ({ ...c, registrationCode: e.target.value }))} className="px-3 py-2 rounded-lg text-sm" style={{ background: 'var(--c-bg)', border: '1px solid var(--c-border)' }} />
             <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={!!config.smtpSecure} onChange={e => setConfig((c: any) => ({ ...c, smtpSecure: e.target.checked }))} /> SMTP SSL/TLS</label>
             <button className="py-2 rounded-lg font-semibold text-sm" style={{ background: 'var(--c-text)', color: '#fff' }}>Zapisz konfiguracje</button>
           </form>

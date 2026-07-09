@@ -45,6 +45,7 @@ interface ServerConfig {
   smtpPass?: string;
   smtpFrom?: string;
   publicAppUrl?: string;
+  registrationCode?: string;
 }
 
 function readConfig(): ServerConfig {
@@ -408,7 +409,7 @@ function historyApiPlugin() {
           }
 
           if (req.method === 'POST' && route === '/register') {
-            const { email, password, name } = await readBody(req);
+            const { email, password, name, registrationCode } = await readBody(req);
             const normalizedEmail = String(email || '').trim().toLowerCase();
             if (!normalizedEmail || !String(password || '').trim()) {
               sendJson(res, 400, { error: 'Email and password are required' });
@@ -420,6 +421,13 @@ function historyApiPlugin() {
             }
 
             const firstUser = userCount() === 0;
+            if (!firstUser) {
+              const cfg = readConfig();
+              if (cfg.registrationCode && String(registrationCode || '').trim() !== cfg.registrationCode) {
+                sendJson(res, 403, { error: 'Invalid registration code' });
+                return;
+              }
+            }
             const passwordHash = await bcrypt.hash(String(password), 12);
             const activationToken = firstUser ? null : crypto.randomBytes(32).toString('hex');
             try {
@@ -562,6 +570,7 @@ function historyApiPlugin() {
               smtpUser: cfg.smtpUser ?? '',
               smtpFrom: cfg.smtpFrom ?? '',
               publicAppUrl: cfg.publicAppUrl ?? '',
+              hasRegistrationCode: !!cfg.registrationCode,
             });
             return;
           }
@@ -569,7 +578,7 @@ function historyApiPlugin() {
           if (route === '/config' && req.method === 'POST') {
             const body = await readBody(req);
             const patch: Partial<ServerConfig> = {};
-            for (const key of ['apiKey', 'model', 'smtpHost', 'smtpUser', 'smtpPass', 'smtpFrom', 'publicAppUrl'] as const) {
+            for (const key of ['apiKey', 'model', 'smtpHost', 'smtpUser', 'smtpPass', 'smtpFrom', 'publicAppUrl', 'registrationCode'] as const) {
               if (typeof body[key] === 'string' && body[key].trim()) patch[key] = body[key].trim() as any;
             }
             if (body.smtpPort !== undefined) patch.smtpPort = Number(body.smtpPort) || 587;
